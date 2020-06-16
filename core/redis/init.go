@@ -224,7 +224,6 @@ func (r *RedisGo) RSSHPool() *redis.Pool {
 			redisc := redis.NewConn(c, -1, -1)
 
 			fmt.Println("RSSHPool SSH连接池连接　", r.RedisPassword)
-
 			if r.RedisPassword != "" {
 				if _, authErr := redisc.Do("AUTH", r.RedisPassword); authErr != nil {
 					return nil, fmt.Errorf("redis auth password error: %s", authErr)
