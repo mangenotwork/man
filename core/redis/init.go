@@ -7,6 +7,7 @@ package manredis
 import (
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -213,9 +214,9 @@ func (r *RedisGo) RSSHPool() *redis.Pool {
 
 	redisURL := fmt.Sprintf("%s:%d", r.RedisIP, r.RedisPort)
 	return &redis.Pool{
-		MaxIdle:     RedisMaxIdle,
-		MaxActive:   RedisMaxActive,
-		IdleTimeout: time.Duration(RedisIdleTimeoutSec) * time.Second,
+		MaxIdle:     r.RedisMaxIdle,
+		MaxActive:   r.RedisMaxActive,
+		IdleTimeout: time.Duration(r.RedisIdleTimeoutSec) * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := sshClient.Dial("tcp", redisURL)
 			if err != nil {
