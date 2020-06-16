@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"git.zituo.net/liman/mange/core/manredis"
+	"github.com/mangenotwork/man/core/redis"
 )
 
 func main() {

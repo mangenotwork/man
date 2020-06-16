@@ -202,17 +202,7 @@ func (r *RedisGo) RPool() *redis.Pool {
 }
 
 // RSSHPool SSH连接池连接
-// addr : SSH主机地址, 如: 127.0.0.1:22
-// user : SSH用户
-// pass : SSH密码
-// ip : redis服务地址
-// port:  Redis 服务端口
-// password  Redis 服务密码
-// 配置参数  RedisMaxIdle 最大连接
-// 配置参数  RedisMaxActive 最大连接数
-// 配置参数  RedisIdleTimeoutSec 设置超时
-// 返回redis连接池  调用: c := RSSHPool().Get() 返回redis连接
-func　(r *RedisGo) RSSHPool() *redis.Pool {
+func (r *RedisGo) RSSHPool() *redis.Pool {
 	sshClient, err := r.connSSH()
 	if nil != err {
 		fmt.Println(err)
