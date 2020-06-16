@@ -7,8 +7,10 @@ package manredis
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"golang.org/x/crypto/ssh"
 )
 
 // 	定义错误 ErrRedisIPIsEmpty 连接传入的RedisIP为空　则使用这个错误
@@ -170,9 +172,9 @@ func (r *RedisGo) RPool() *redis.Pool {
 	redisURL := fmt.Sprintf("redis://%s:%d", r.RedisIP, r.RedisPort)
 	fmt.Println("redisURL -> ", redisURL)
 	return &redis.Pool{
-		MaxIdle:     RedisMaxIdle,
-		MaxActive:   RedisMaxActive,
-		IdleTimeout: time.Duration(RedisIdleTimeoutSec) * time.Second,
+		MaxIdle:     r.RedisMaxIdle,
+		MaxActive:   r.RedisMaxActive,
+		IdleTimeout: time.Duration(r.RedisIdleTimeoutSec) * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.DialURL(redisURL)
 			if err != nil {
