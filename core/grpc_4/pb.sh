@@ -1,0 +1,1 @@
+protoc -I ./ pb/*.proto --plugin=protoc-gen-go=/media/mange/c73f23f4-81bc-4d93-961c-bb6643e59ea6/MyGo/bin/protoc-gen-go --go_out=plugins=grpc:pb

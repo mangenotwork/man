@@ -3,12 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/zituocn/gow/lib/logy"
 	"google.golang.org/grpc/metadata"
 	"log"
 	"time"
 
-	"go_script/grpc_1/pb/echo"
+	"github.com/mangenotwork/man/core/grpc_1/pb/echo"
 	"google.golang.org/grpc"
 )
 

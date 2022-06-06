@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"go_script/grpc_1/pb/echo"
+	"github.com/mangenotwork/man/core/grpc_1/pb/echo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"

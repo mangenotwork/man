@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "./;pb";
+
+service Mod {
+    rpc ServerMod (RequestData) returns (stream ResponseData);      //服务端流模式，拉消息
+    rpc ClientMod (stream RequestData) returns (ResponseData);      //客户端流模式，推消息
+    rpc AllMod (stream RequestData) returns (stream ResponseData);  //双向流模式，能推能拉
+}
+
+message RequestData {
+    string data = 1;
+}
+
+message ResponseData {
+    string data = 1;
+}
