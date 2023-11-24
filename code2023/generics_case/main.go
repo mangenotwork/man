@@ -5,6 +5,7 @@
 package main
 
 import (
+	"golang.org/x/exp/constraints"
 	"log"
 )
 
@@ -16,13 +17,27 @@ func main() {
 	log.Println(SliceRemoveDuplicate(test1))
 	log.Println(SliceRemoveDuplicate(test2))
 
+	log.Println(Min(1, 3))
+	log.Println(Min(3.2, 3))
+
+	log.Println(IsContain(test1, 1))
+	log.Println(IsContain(test2, "11"))
+
+	log.Println(IF(true, "1", "asdas"))
+	log.Println(IF(false, 1, 1111))
+
+	test11 := CopySlice(test1)
+	log.Println(test11)
+	test22 := CopySlice(test2)
+	log.Println(test22)
+
 }
 
 type SliceType interface {
 	int | uint | int8 | uint8 | int16 | uint16 | int32 | uint32 | int64 | uint64 | float32 | float64 | string | bool |
-		*int | *uint | *int8 | *uint8 | *int16 | *uint16 | *int32 | *uint32 | *int64 | *uint64 | *float32 | *float64 | *string | *bool |
-		chan int | chan uint | chan int8 | chan uint8 | chan int16 | chan uint16 | chan int32 | chan uint32 | chan int64 | chan uint64 | chan float32 | chan float64 | chan string | chan bool |
-		chan *int | chan *uint | chan *int8 | chan *uint8 | chan *int16 | chan *uint16 | chan *int32 | chan *uint32 | chan *int64 | chan *uint64 | chan *float32 | chan *float64 | chan *string | chan *bool
+	*int | *uint | *int8 | *uint8 | *int16 | *uint16 | *int32 | *uint32 | *int64 | *uint64 | *float32 | *float64 | *string | *bool |
+	chan int | chan uint | chan int8 | chan uint8 | chan int16 | chan uint16 | chan int32 | chan uint32 | chan int64 | chan uint64 | chan float32 | chan float64 | chan string | chan bool |
+	chan *int | chan *uint | chan *int8 | chan *uint8 | chan *int16 | chan *uint16 | chan *int32 | chan *uint32 | chan *int64 | chan *uint64 | chan *float32 | chan *float64 | chan *string | chan *bool
 }
 
 // SliceRemoveDuplicate slice去重
@@ -109,4 +124,42 @@ func SliceIsExist[T SliceType](data []T, param T) bool {
 		return false
 	}
 	return true
+}
+
+func isNaN[T constraints.Ordered](x T) bool {
+	return x != x
+}
+
+func Min[T constraints.Ordered](a, b T) T {
+	if a < b || isNaN(a) {
+		return a
+	}
+	return b
+}
+
+func Max[T constraints.Ordered](a, b T) T {
+	if a > b || isNaN(a) {
+		return a
+	}
+	return b
+}
+
+func IsContain[T SliceType](items []T, item T) bool {
+	for i := 0; i < len(items); i++ {
+		if items[i] == item {
+			return true
+		}
+	}
+	return false
+}
+
+func IF[T any](condition bool, a, b T) T {
+	if condition {
+		return a
+	}
+	return b
+}
+
+func CopySlice[T SliceType](s []T) []T {
+	return append(s[:0:0], s...)
 }
