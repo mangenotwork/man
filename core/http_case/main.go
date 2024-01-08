@@ -7,8 +7,9 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/", hello) // 注册自己业务处理的Hander
-	http.HandleFunc("/echo", echo)
+	//http.HandleFunc("/", hello) // 注册自己业务处理的Hander
+	//http.HandleFunc("/echo", echo)
+	http.Handle("/", http.FileServer(http.Dir("/home/mange/Documents")))
 	server := http.Server{Addr: ":8777"}
 	if err := server.ListenAndServe(); err != nil { // 监听处理
 		fmt.Println("server start failed")
