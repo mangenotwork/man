@@ -16,6 +16,7 @@ func main() {
 	log.Println(removeDuplicates(test2))
 
 	log.Println(removeDuplicates2(test1))
+	log.Println(test1)
 	log.Println(removeDuplicates2(test2))
 
 }
