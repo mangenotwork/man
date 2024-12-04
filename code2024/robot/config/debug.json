@@ -1,0 +1,12 @@
+{
+  "common_path": "../common/config/common-config.json",
+  "login_server": {
+    "scheme": "https",
+    "host": "10.0.40.199",
+    "conferenceId": 0,
+    "sceneId": 2000000,
+    "SceneUniqueNO": "",
+    "minId": 1000,
+    "maxId": 1999
+  }
+}

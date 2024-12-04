@@ -1,0 +1,502 @@
+{
+  "0": {
+    "points": [
+      {
+        "index": 0,
+        "sceneId": 2000000,
+        "name": "TesPoint_0",
+        "position": {
+          "x": 5.671196,
+          "y": 10.41,
+          "z": -10.56489
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 1,
+        "sceneId": 2000000,
+        "name": "TesPoint_1",
+        "position": {
+          "x": 9.494423,
+          "y": 10.41,
+          "z": -5.0371
+        },
+        "rotation": {
+          "x": 0,
+          "y": 83.94704,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 2,
+        "sceneId": 2000000,
+        "name": "TesPoint_2",
+        "position": {
+          "x": 12.79537,
+          "y": 10.41,
+          "z": 4.844461
+        },
+        "rotation": {
+          "x": 0,
+          "y": 87.54892,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 3,
+        "sceneId": 2000000,
+        "name": "TesPoint_3",
+        "position": {
+          "x": 8.546432,
+          "y": 10.41,
+          "z": 17.5654
+        },
+        "rotation": {
+          "x": 0,
+          "y": 329.2257,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 4,
+        "sceneId": 2000000,
+        "name": "TesPoint_4",
+        "position": {
+          "x": -3.950091,
+          "y": 10.41,
+          "z": 7.992984
+        },
+        "rotation": {
+          "x": 0,
+          "y": 183.6678,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 5,
+        "sceneId": 2000000,
+        "name": "TesPoint_5",
+        "position": {
+          "x": 3.155121,
+          "y": 10.41,
+          "z": -5.635897
+        },
+        "rotation": {
+          "x": 0,
+          "y": 125.0395,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      }
+    ],
+    "isLoop": true,
+    "pathType": "Auto",
+    "index": 0,
+    "state": 1,
+    "companyId": 100002,
+    "companyName": "巢云互动",
+    "name": "事实上"
+  },
+  "1": {
+    "points": [
+      {
+        "index": 0,
+        "sceneId": 2000000,
+        "name": "TesPoint_0",
+        "position": {
+          "x": 5.67,
+          "y": 10.41,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 1,
+        "sceneId": 2000000,
+        "name": "TesPoint_1",
+        "position": {
+          "x": -5.176334,
+          "y": 10.41,
+          "z": 0.05367807
+        },
+        "rotation": {
+          "x": 0,
+          "y": 290.8132,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 2,
+        "sceneId": 2000000,
+        "name": "TesPoint_2",
+        "position": {
+          "x": -10.21951,
+          "y": 10.62127,
+          "z": 1.810209
+        },
+        "rotation": {
+          "x": 0,
+          "y": 233.9258,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 3,
+        "sceneId": 2000000,
+        "name": "TesPoint_3",
+        "position": {
+          "x": -15.89558,
+          "y": 10.52698,
+          "z": -2.954069
+        },
+        "rotation": {
+          "x": 0,
+          "y": 229.9912,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 4,
+        "sceneId": 2000000,
+        "name": "TesPoint_4",
+        "position": {
+          "x": -22.18888,
+          "y": 10.52698,
+          "z": -5.69415
+        },
+        "rotation": {
+          "x": 0,
+          "y": 250.9108,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 5,
+        "sceneId": 2000000,
+        "name": "TesPoint_5",
+        "position": {
+          "x": -10.30007,
+          "y": 10.41,
+          "z": 7.145978
+        },
+        "rotation": {
+          "x": 0,
+          "y": 329.1665,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 6,
+        "sceneId": 2000000,
+        "name": "TesPoint_6",
+        "position": {
+          "x": 3.792282,
+          "y": 10.41,
+          "z": 19.07825
+        },
+        "rotation": {
+          "x": 0,
+          "y": 67.62601,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 7,
+        "sceneId": 2000000,
+        "name": "TesPoint_7",
+        "position": {
+          "x": 14.7867,
+          "y": 10.41,
+          "z": 9.022635
+        },
+        "rotation": {
+          "x": 0,
+          "y": 141.1752,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 8,
+        "sceneId": 2000000,
+        "name": "TesPoint_8",
+        "position": {
+          "x": 9.737288,
+          "y": 10.56836,
+          "z": 4.667773
+        },
+        "rotation": {
+          "x": 0,
+          "y": 253.1966,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 9,
+        "sceneId": 2000000,
+        "name": "TesPoint_9",
+        "position": {
+          "x": 5.67,
+          "y": 10.4,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      }
+    ],
+    "isLoop": true,
+    "pathType": "Auto",
+    "index": 1,
+    "state": 1,
+    "companyId": 100002,
+    "companyName": "巢云互动",
+    "name": "333"
+  },
+  "2": {
+    "points": [
+      {
+        "index": 0,
+        "sceneId": 2000000,
+        "name": "TesPoint_0",
+        "position": {
+          "x": 5.67,
+          "y": 10.4,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 1,
+        "sceneId": 2000000,
+        "name": "TesPoint_1",
+        "position": {
+          "x": 21.00587,
+          "y": 10.41,
+          "z": 5.709649
+        },
+        "rotation": {
+          "x": 0,
+          "y": 285.0159,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 2,
+        "sceneId": 2000000,
+        "name": "TesPoint_2",
+        "position": {
+          "x": 5.67,
+          "y": 10.39,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      }
+    ],
+    "isLoop": true,
+    "pathType": "Auto",
+    "index": 2,
+    "state": 1,
+    "companyId": 100002,
+    "companyName": "巢云互动",
+    "name": "4444"
+  },
+  "3": {
+    "points": [
+      {
+        "index": 0,
+        "sceneId": 2000000,
+        "name": "TesPoint_0",
+        "position": {
+          "x": 5.67,
+          "y": 10.39,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 1,
+        "sceneId": 2000000,
+        "name": "TesPoint_1",
+        "position": {
+          "x": 3.499215,
+          "y": 11.16716,
+          "z": 7.451761
+        },
+        "rotation": {
+          "x": 0,
+          "y": 357.9425,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 2,
+        "sceneId": 2000000,
+        "name": "TesPoint_2",
+        "position": {
+          "x": 6.410368,
+          "y": 10.41,
+          "z": 17.5058
+        },
+        "rotation": {
+          "x": 0,
+          "y": 15.87129,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 3,
+        "sceneId": 2000000,
+        "name": "TesPoint_3",
+        "position": {
+          "x": 11.70597,
+          "y": 10.41,
+          "z": 5.656466
+        },
+        "rotation": {
+          "x": 0,
+          "y": 96.04518,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      },
+      {
+        "index": 4,
+        "sceneId": 2000000,
+        "name": "TesPoint_4",
+        "position": {
+          "x": 5.67,
+          "y": 10.39,
+          "z": -10.56
+        },
+        "rotation": {
+          "x": 0,
+          "y": 56.09259,
+          "z": 0
+        },
+        "moveType": "Run",
+        "canInteract": false,
+        "interactTime": 0,
+        "waitTime": 0
+      }
+    ],
+    "isLoop": true,
+    "pathType": "Auto",
+    "index": 3,
+    "state": 1,
+    "companyId": 100002,
+    "companyName": "巢云互动",
+    "name": "555"
+  }
+}
