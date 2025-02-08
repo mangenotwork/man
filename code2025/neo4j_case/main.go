@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -34,7 +35,13 @@ go库教程: https://blog.csdn.net/lt326030434/article/details/124492583
 
 func main() {
 
-	case2()
+	a := ""
+	b := strings.Split(a, ",")
+
+	log.Println(b)
+	log.Println(len(b))
+
+	//case2()
 }
 
 func case1() {
