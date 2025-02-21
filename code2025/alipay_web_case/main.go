@@ -110,39 +110,14 @@ func sendPaymentRequest(appId, notifyUrl, returnUrl, subject, outTradeNo, totalA
 }
 
 func main() {
-	appId := "2021004159667146"
-	notifyUrl := "https://www.ecosmos.cc/cn/"
-	returnUrl := "https://www.ecosmos.cc/cn/"
+	appId := ""
+	notifyUrl := ""
+	returnUrl := ""
 	subject := "Test Product"
 	outTradeNo := fmt.Sprintf("trade_%d", time.Now().Unix())
 	totalAmount := "0.01" // 注意：这里仅为测试，实际金额请按需设置
 	privateKey := `-----BEGIN RSA PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCts44WBFiJEefu
-6p3bZsQtLaJDMpYOoeDGLrjJ0X3pOIqPlsG3j1wwPcIWdTO4UucZHuNmlukorCtI
-hX0Jlei7aW/i8Ol74JcT8QA3twBhsEXDJXjAxAlUVRcUf6dP6FveHVeYhi6l68MC
-hq9OrbxntVN5UhqVDwVB1CvmZlyAHNEnb9njz0wq5jkP6MBuZ6pW53J8ejog5e3u
-I8dDsrncrZgpzY8ztNgQ3LHKpjTAnYpWRojS79xVs8EwlgPwtuKjaa6Wh2KjKYfA
-mtSEW2lbOdhg12smU/d68ml4WAV/BHsuuo/il0DZnqoQrv5J5dNgXtL1Nq87Cxgg
-s4N5UrsrAgMBAAECggEBAIkcCVThu0z/AFe7hD1SIhoTQljOjlogdz+YU66imUPF
-qMHs2x5coAVISnLVsqyVa+uNUSyChKrhNA07qVYuqZV9hZ7aUULCJh7MhkJ0Rm3V
-6Us/wdBPLZoOzHgWx2ew3ws1mBZCHIJF1hmhXLG7O9OU8r36DBeK0riClOB5/hv0
-1kViAKHhNsa0t01oDr9dDps44nBFXraaNObWYt3fqOe/OxuKYqsBl6hdap08mNAk
-j/AkxgOvz7ANr+p/aXVrrnzAWLJa//MuIoc1kluZjQipF+s3HyAh/JbX56JvsSjx
-QvaseJglOVumNOjFsueCVbs4kfQqpBRN9OtFFKcKYSkCgYEA1i1xEhltxeMcNADG
-w5RcHYNxIsX8mms1RBPL+EnRr4YS0geipG1xudZAnsTQgm+jaYejZAWaiIy1W5J6
-tPQ67+WhZ6H8oIjEEhAA8TW9unydu6//i7v+0JI2SJGAE+txPsF76X7l2foq4Tcf
-upIaBkX7zmbKROmrK/TL75WU2MUCgYEAz56+x3RiNEa7jgNc74INvNEg/3RWdw51
-uOWLnh8Yb90D0ftSss7U/eyX6Z5yKd9odBwV41BgCMxqlwtIYuF6gjOKt+Z+hgkB
-mhDcvya11FmMldAl/GN7rIJnWG3ckppv1q/tDgqWhy2u4P/eiLYcw+pjWTbz45mt
-/J/uaEGsIy8CgYA97r/+ktnaWjUCmKLhVVpZsnOZsZS89nldqTfXIUmALw3sLAcM
-8xTqvxjKkHEW9r9TOcS2nKQ2DjI3O6E+CE2up0FIHWBW75V6/6O2HGszrOtTpa4I
-syEZIN6Pl3toxzFlC0AQogBHSv7xRyZmpe7el4gcBD9DNCqqOExsiF2VXQKBgCcl
-kmk/K4kZ0SFcxvgt+HMip2sjP25hXpcHSQT+bfghnyfHkHdAgm6CXr5g7ruwcRx7
-czESJZljGbHzIanrQ9Mq7rvwDOku54tqJIUyQlSQse5JefAVverwB5Zn2JAX6IB9
-WWAtZOaGGZQ5CneShuf12NeogeHnRyP779LelxtnAoGAXvd1TVCHb3X9kECXF3De
-qKZSpMaC1cuCrCu4Gn0vvAoLwo5YfYSuqfoYsq7V4V17w9bc24v21kjN+dPucxzG
-9reqYkQyRxoUOBCxVJSiLpDU2VfPf57+iIJKT89NjS0EJeOB7GcJrTe6KQ0EjhFd
-7SWStwEaZz2bGCPGXAEwLbE=
+.......
 -----END RSA PRIVATE KEY-----`
 
 	if err := sendPaymentRequest(appId, notifyUrl, returnUrl, subject, outTradeNo, totalAmount, privateKey); err != nil {
