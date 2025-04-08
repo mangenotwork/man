@@ -1,0 +1,32 @@
+# 这行代码指定了 Dockerfile 使用的语法版本。docker/dockerfile:1 表明使用的是 Dockerfile
+# 最新的稳定语法版本，有助于确保 Docker 构建过程能正确解析 Dockerfile 中的指令
+# syntax=docker/dockerfile:1
+
+# FROM 指令用于指定基础镜像用与编译
+# as build 为这个构建阶段命名为 build，方便后续阶段引用
+FROM golang:1.21 as build
+
+COPY . /root
+WORKDIR /root
+
+# Build
+RUN CGO_ENABLED=0 GOOS=linux go build -o /durabletask-go
+
+# 最终阶段
+# 此阶段使用 gcr.io/distroless/static-debian12:nonroot 作为基础镜像。distroless 镜像不包含不必要的系统工具和包，
+# 体积小且安全性高；nonroot 表示以非 root 用户运行
+FROM gcr.io/distroless/static-debian12:nonroot
+
+# COPY --from=build 是多阶段构建的关键指令，它从之前命名为 build 的阶段复制 /durabletask-go 文件到当前镜像的根目录。
+COPY --from=build /durabletask-go /
+
+EXPOSE 4001
+
+# Run
+ENTRYPOINT [ "/durabletask-go" ]
+CMD [ "--host", "0.0.0.0", "--port", "4001" ]
+
+# 总结
+# 这个 Dockerfile 使用了多阶段构建，先在 golang:1.21 镜像中编译 Go 项目，然后将编译好的可执行文件复制
+# 到轻量级的 distroless 镜像中。这样可以得到一个体积小、安全性高的最终镜像，适合在生产环境中部署。同时，
+# 它还声明了容器监听的端口，并配置了容器启动时的命令和参数。
