@@ -48,9 +48,80 @@ func main() {
 
 	// case18()
 
-	case19()
+	// case19()
 
+	// case20()
+
+	// case21()
+
+	case22()
 }
+
+func getTestImg() image.Image {
+	filePath := "./test.png"
+
+	// 打开图像文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filePath[strings.LastIndex(filePath, ".")+1:])
+
+	var img image.Image
+
+	// 解码图像
+	switch ext {
+	case "jpg", "jpeg":
+		img, err = jpeg.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case "png":
+		img, err = png.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("Unsupported image format: %s", ext)
+	}
+	return img
+}
+
+func getTest2Img() image.Image {
+	filePath := "./test2.jpg"
+
+	// 打开图像文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filePath[strings.LastIndex(filePath, ".")+1:])
+
+	var img image.Image
+
+	// 解码图像
+	switch ext {
+	case "jpg", "jpeg":
+		img, err = jpeg.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case "png":
+		img, err = png.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("Unsupported image format: %s", ext)
+	}
+	return img
+}
+
+// ========================================================================
 
 // 图像点的运算通常涉及到读取、修改和处理图像中每个像素点的颜色值
 func case1() {
@@ -100,37 +171,7 @@ func case1() {
 	}
 }
 
-func getTestImg() image.Image {
-	filePath := "./test.png"
-
-	// 打开图像文件
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	ext := strings.ToLower(filePath[strings.LastIndex(filePath, ".")+1:])
-
-	var img image.Image
-
-	// 解码图像
-	switch ext {
-	case "jpg", "jpeg":
-		img, err = jpeg.Decode(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-	case "png":
-		img, err = png.Decode(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-	default:
-		log.Fatalf("Unsupported image format: %s", ext)
-	}
-	return img
-}
+// ========================================================================
 
 func case2() {
 	img := getTestImg()
@@ -165,6 +206,8 @@ func case2() {
 	}
 
 }
+
+// ========================================================================
 
 // case3 图像点的亮度调整
 func case3() {
@@ -218,37 +261,7 @@ func case3() {
 
 }
 
-func getTest2Img() image.Image {
-	filePath := "./test2.jpg"
-
-	// 打开图像文件
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	ext := strings.ToLower(filePath[strings.LastIndex(filePath, ".")+1:])
-
-	var img image.Image
-
-	// 解码图像
-	switch ext {
-	case "jpg", "jpeg":
-		img, err = jpeg.Decode(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-	case "png":
-		img, err = png.Decode(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-	default:
-		log.Fatalf("Unsupported image format: %s", ext)
-	}
-	return img
-}
+// ========================================================================
 
 // 图像加法可以用于合成图像或增加图像的亮度
 func case4() {
@@ -287,6 +300,8 @@ func case4() {
 	}
 }
 
+// ========================================================================
+
 // 图像减法可以用于检测图像中的变化或突出差异
 func case5() {
 	img1 := getTestImg()
@@ -324,6 +339,8 @@ func case5() {
 	}
 }
 
+// ========================================================================
+
 // 图像乘法可以用于调整图像的亮度或对比度
 func case6() {
 	img := getTestImg()
@@ -360,6 +377,8 @@ func case6() {
 	}
 }
 
+// ========================================================================
+
 // 图像除法可以用于调整图像的对比度
 func case7() {
 	img := getTestImg()
@@ -395,6 +414,8 @@ func case7() {
 		log.Fatal(err)
 	}
 }
+
+// ========================================================================
 
 // 图像的逻辑运算通常指的是对图像像素进行按位逻辑操作，例如与（AND）、或（OR）、异或（XOR）和非（NOT）操作。
 // 这些操作可以用于图像的特征提取、图像掩码处理等场景
@@ -445,6 +466,8 @@ func case8() {
 	}
 }
 
+// ========================================================================
+
 // case9 图像缩放  使用 golang.org/x/image/draw 包实现图像缩放
 // 除了 draw.BiLinear，golang.org/x/image/draw 包还提供了其他的缩放算法，例如：
 // draw.NearestNeighbor：最近邻插值，速度快，但可能会导致图像出现锯齿。
@@ -474,6 +497,8 @@ func case9() {
 		log.Fatal(err)
 	}
 }
+
+// ========================================================================
 
 // case10 旋转图像
 func case10() {
@@ -572,6 +597,8 @@ func Rotate270Clockwise(src image.Image) image.Image {
 
 	return dst
 }
+
+// ========================================================================
 
 // case11 自定义旋转角度
 func case11() {
@@ -680,6 +707,8 @@ func interpolateColor(c1, c2 color.Color, t float64) (uint8, uint8, uint8, uint8
 	return r, g, b, a
 }
 
+// ========================================================================
+
 // case12 图片平移
 func case12() {
 	src := getTestImg()
@@ -714,6 +743,8 @@ func case12() {
 	}
 }
 
+// ========================================================================
+
 // case13 图像裁剪
 func case13() {
 	src := getTestImg()
@@ -735,6 +766,8 @@ func case13() {
 		panic(err)
 	}
 }
+
+// ========================================================================
 
 // case14 图像转置
 func case14() {
@@ -763,6 +796,8 @@ func case14() {
 		panic(err)
 	}
 }
+
+// ========================================================================
 
 // case15 图像镜像
 func case15() {
@@ -828,6 +863,8 @@ func verticalMirror(src image.Image) image.Image {
 	return dst
 }
 
+// ========================================================================
+
 // case16 计算图像的灰度直方图
 // 人类的视觉系统对不同颜色的敏感度是不一样的，相较于蓝色，人眼对绿色更为敏感，对红色的敏感度则处于两者之间。所以在转换过程中，
 // 不能简单地取 RGB 三个值的平均值，而是要依据它们的重要程度赋予不同的权重。具体来说，常用的转换公式为：
@@ -849,6 +886,8 @@ func calculateHistogram(img image.Image) [256]int {
 	}
 	return histogram
 }
+
+// ========================================================================
 
 // case17 使用双线性插值进行图像增强
 func case17() {
@@ -964,6 +1003,8 @@ func adjustContrast(img image.Image, factor float64) image.Image {
 	return dst
 }
 
+// ========================================================================
+
 // case18 将彩色图转换为灰度图
 func case18() {
 	src := getTest2Img()
@@ -998,6 +1039,8 @@ func case18() {
 		panic(err)
 	}
 }
+
+// ========================================================================
 
 // case19 转二值图像
 // 二值图像是一种特殊的图像类型，其每个像素点只有两种取值，通常用 0 和 1 来表示，也可以用黑色和白色来直观地表示，所以二值图像也常被称为黑白图像
@@ -1041,5 +1084,521 @@ func case19() {
 	}
 
 }
+
+// ========================================================================
+
+// case20 图像刚性变换、仿射变换和透视变换
+// 这些实现使用最近邻插值，对于高质量图像处理建议添加双线性插值等抗锯齿技术
+
+// RigidTransform 刚性变换（旋转、缩放、平移）
+func RigidTransform(img image.Image, angle float64, scale float64, tx float64, ty float64) *image.RGBA {
+	radian := angle * math.Pi / 180
+	cos := math.Cos(radian)
+	sin := math.Sin(radian)
+
+	// 构建仿射变换矩阵参数
+	mat := [6]float64{
+		scale * cos, -scale * sin, tx,
+		scale * sin, scale * cos, ty,
+	}
+
+	return affineTransform(img, mat)
+}
+
+// AffineTransform 仿射变换
+func AffineTransform(img image.Image, mat [6]float64) *image.RGBA {
+	return affineTransform(img, mat)
+}
+
+// PerspectiveTransform 透视变换
+func PerspectiveTransform(img image.Image, mat [9]float64) *image.RGBA {
+	a, b, c := mat[0], mat[1], mat[2]
+	d, e, f := mat[3], mat[4], mat[5]
+	g, h, i := mat[6], mat[7], mat[8]
+
+	det := a*(e*i-f*h) - b*(d*i-f*g) + c*(d*h-e*g)
+	if det == 0 {
+		return cloneImage(img)
+	}
+
+	invDet := 1.0 / det
+	h11 := (e*i - f*h) * invDet
+	h12 := (c*h - b*i) * invDet
+	h13 := (b*f - c*e) * invDet
+	h21 := (f*g - d*i) * invDet
+	h22 := (a*i - c*g) * invDet
+	h23 := (c*d - a*f) * invDet
+	h31 := (d*h - e*g) * invDet
+	h32 := (b*g - a*h) * invDet
+	h33 := (a*e - b*d) * invDet
+
+	bounds := img.Bounds()
+	dest := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			xH := float64(x)
+			yH := float64(y)
+			wH := 1.0
+
+			X := h11*xH + h12*yH + h13*wH
+			Y := h21*xH + h22*yH + h23*wH
+			W := h31*xH + h32*yH + h33*wH
+
+			if W == 0 {
+				dest.Set(x, y, color.RGBA{0, 0, 0, 255})
+				continue
+			}
+
+			srcX := X / W
+			srcY := Y / W
+			srcXInt := int(math.Round(srcX))
+			srcYInt := int(math.Round(srcY))
+
+			if inBounds(img.Bounds(), srcXInt, srcYInt) {
+				dest.Set(x, y, img.At(srcXInt, srcYInt))
+			} else {
+				dest.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return dest
+}
+
+// 仿射变换核心实现
+func affineTransform(img image.Image, mat [6]float64) *image.RGBA {
+	bounds := img.Bounds()
+	dest := image.NewRGBA(bounds)
+
+	a, b, c := mat[0], mat[1], mat[2]
+	d, e, f := mat[3], mat[4], mat[5]
+
+	det := a*e - b*d
+	if det == 0 {
+		return cloneImage(img)
+	}
+
+	invDet := 1.0 / det
+	aPrime := e * invDet
+	bPrime := -b * invDet
+	cPrime := (-e*c + b*f) * invDet
+	dPrime := -d * invDet
+	ePrime := a * invDet
+	fPrime := (d*c - a*f) * invDet
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			srcX := aPrime*float64(x) + bPrime*float64(y) + cPrime
+			srcY := dPrime*float64(x) + ePrime*float64(y) + fPrime
+
+			srcXInt := int(math.Round(srcX))
+			srcYInt := int(math.Round(srcY))
+
+			if inBounds(bounds, srcXInt, srcYInt) {
+				dest.Set(x, y, img.At(srcXInt, srcYInt))
+			} else {
+				dest.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return dest
+}
+
+// 辅助函数：克隆图像
+func cloneImage(img image.Image) *image.RGBA {
+	bounds := img.Bounds()
+	clone := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			clone.Set(x, y, img.At(x, y))
+		}
+	}
+	return clone
+}
+
+// 辅助函数：检查坐标是否在边界内
+func inBounds(bounds image.Rectangle, x, y int) bool {
+	return x >= bounds.Min.X && x < bounds.Max.X &&
+		y >= bounds.Min.Y && y < bounds.Max.Y
+}
+
+func case20() {
+	src := getTest2Img()
+
+	dst1 := RigidTransform(src, 10, 1, 0, 0)
+
+	outputFileName1 := "output_case20-1.jpg"
+	outputFile1, err := os.Create(outputFileName1)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile1.Close()
+	err = jpeg.Encode(outputFile1, dst1, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+	dst2 := AffineTransform(src, [6]float64{0, 50, 100, 100, 50, 0})
+	outputFileName2 := "output_case20-2.jpg"
+	outputFile2, err := os.Create(outputFileName2)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile2.Close()
+	err = jpeg.Encode(outputFile2, dst2, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+	dst3 := PerspectiveTransform(src, [9]float64{0, 50, 100, 100, 0, 0, 50, 100, 100})
+	outputFileName3 := "output_case20-3.jpg"
+	outputFile3, err := os.Create(outputFileName3)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile3.Close()
+	err = jpeg.Encode(outputFile3, dst3, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// 例子效果失败
+
+// case21 图像的刚性变换，仿射变换，透视变换，添加双线性插值等抗锯齿技术
+
+// 双线性插值用于根据浮点坐标计算像素值。
+func bilinearInterpolation(img *image.RGBA, x, y float64) color.RGBA {
+	x1, y1 := int(x), int(y)
+	x2, y2 := x1+1, y1+1
+	if x2 >= img.Bounds().Max.X {
+		x2 = img.Bounds().Max.X - 1
+	}
+	if y2 >= img.Bounds().Max.Y {
+		y2 = img.Bounds().Max.Y - 1
+	}
+
+	q11 := img.RGBAAt(x1, y1)
+	q12 := img.RGBAAt(x1, y2)
+	q21 := img.RGBAAt(x2, y1)
+	q22 := img.RGBAAt(x2, y2)
+
+	xfrac, yfrac := x-float64(x1), y-float64(y1)
+
+	r := uint8((1-xfrac)*(1-yfrac)*float64(q11.R) +
+		xfrac*(1-yfrac)*float64(q21.R) +
+		(1-xfrac)*yfrac*float64(q12.R) +
+		xfrac*yfrac*float64(q22.R))
+	g := uint8((1-xfrac)*(1-yfrac)*float64(q11.G) +
+		xfrac*(1-yfrac)*float64(q21.G) +
+		(1-xfrac)*yfrac*float64(q12.G) +
+		xfrac*yfrac*float64(q22.G))
+	b := uint8((1-xfrac)*(1-yfrac)*float64(q11.B) +
+		xfrac*(1-yfrac)*float64(q21.B) +
+		(1-xfrac)*yfrac*float64(q12.B) +
+		xfrac*yfrac*float64(q22.B))
+
+	return color.RGBA{R: r, G: g, B: b, A: 255}
+}
+
+// 平移
+func translate(img *image.RGBA, dx, dy int) *image.RGBA {
+	bounds := img.Bounds()
+	newImg := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			newX, newY := x-dx, y-dy
+			if newX >= bounds.Min.X && newX < bounds.Max.X &&
+				newY >= bounds.Min.Y && newY < bounds.Max.Y {
+				newImg.Set(x, y, img.At(newX, newY))
+			} else {
+				newImg.Set(x, y, color.RGBA{0, 0, 0, 255}) // 背景黑色
+			}
+		}
+	}
+	return newImg
+}
+
+// 缩放
+func scale(img *image.RGBA, scaleX, scaleY float64) *image.RGBA {
+	bounds := img.Bounds()
+	newWidth := int(float64(bounds.Dx()) * scaleX)
+	newHeight := int(float64(bounds.Dy()) * scaleY)
+	newImg := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+
+	for y := 0; y < newHeight; y++ {
+		for x := 0; x < newWidth; x++ {
+			srcX, srcY := float64(x)/scaleX, float64(y)/scaleY
+			newImg.Set(x, y, bilinearInterpolation(img, srcX, srcY))
+		}
+	}
+	return newImg
+}
+
+// 旋转
+func rotate(img *image.RGBA, angle float64) *image.RGBA {
+	bounds := img.Bounds()
+	centerX, centerY := float64(bounds.Dx())/2, float64(bounds.Dy())/2
+	cosA, sinA := math.Cos(angle), math.Sin(angle)
+
+	newImg := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// 将 (x, y) 映射回原图
+			rotatedX := (float64(x)-centerX)*cosA + (float64(y)-centerY)*sinA + centerX
+			rotatedY := -(float64(x)-centerX)*sinA + (float64(y)-centerY)*cosA + centerY
+
+			if rotatedX >= 0 && rotatedX < float64(bounds.Dx()) &&
+				rotatedY >= 0 && rotatedY < float64(bounds.Dy()) {
+				newImg.Set(x, y, bilinearInterpolation(img, rotatedX, rotatedY))
+			} else {
+				newImg.Set(x, y, color.RGBA{0, 0, 0, 255}) // 背景黑色
+			}
+		}
+	}
+	return newImg
+}
+
+// 仿射变换通过 2x3 矩阵实现
+func affineTransform23(img *image.RGBA, matrix [2][3]float64) *image.RGBA {
+	bounds := img.Bounds()
+	newImg := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// 计算逆变换
+			det := matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0]
+			if det == 0 {
+				continue
+			}
+			invM := [2][3]float64{
+				{matrix[1][1] / det, -matrix[0][1] / det, (matrix[0][1]*matrix[1][2] - matrix[1][1]*matrix[0][2]) / det},
+				{-matrix[1][0] / det, matrix[0][0] / det, (matrix[1][0]*matrix[0][2] - matrix[0][0]*matrix[1][2]) / det},
+			}
+
+			srcX := invM[0][0]*float64(x) + invM[0][1]*float64(y) + invM[0][2]
+			srcY := invM[1][0]*float64(x) + invM[1][1]*float64(y) + invM[1][2]
+
+			if srcX >= 0 && srcX < float64(bounds.Dx()) &&
+				srcY >= 0 && srcY < float64(bounds.Dy()) {
+				newImg.Set(x, y, bilinearInterpolation(img, srcX, srcY))
+			} else {
+				newImg.Set(x, y, color.RGBA{0, 0, 0, 255}) // 背景黑色
+			}
+		}
+	}
+	return newImg
+}
+
+// 透视变换通过 3x3 矩阵实现
+func perspectiveTransform(img *image.RGBA, matrix [3][3]float64) *image.RGBA {
+	bounds := img.Bounds()
+	newImg := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// 计算逆变换
+			det := matrix[0][0]*(matrix[1][1]*matrix[2][2]-matrix[1][2]*matrix[2][1]) -
+				matrix[0][1]*(matrix[1][0]*matrix[2][2]-matrix[1][2]*matrix[2][0]) +
+				matrix[0][2]*(matrix[1][0]*matrix[2][1]-matrix[1][1]*matrix[2][0])
+			if det == 0 {
+				continue
+			}
+			invM := [3][3]float64{
+				{(matrix[1][1]*matrix[2][2] - matrix[1][2]*matrix[2][1]) / det,
+					(matrix[0][2]*matrix[2][1] - matrix[0][1]*matrix[2][2]) / det,
+					(matrix[0][1]*matrix[1][2] - matrix[0][2]*matrix[1][1]) / det},
+				{(matrix[1][2]*matrix[2][0] - matrix[1][0]*matrix[2][2]) / det,
+					(matrix[0][0]*matrix[2][2] - matrix[0][2]*matrix[2][0]) / det,
+					(matrix[0][2]*matrix[1][0] - matrix[0][0]*matrix[1][2]) / det},
+				{(matrix[1][0]*matrix[2][1] - matrix[1][1]*matrix[2][0]) / det,
+					(matrix[0][1]*matrix[2][0] - matrix[0][0]*matrix[2][1]) / det,
+					(matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0]) / det},
+			}
+
+			w := invM[2][0]*float64(x) + invM[2][1]*float64(y) + invM[2][2]
+			srcX := (invM[0][0]*float64(x) + invM[0][1]*float64(y) + invM[0][2]) / w
+			srcY := (invM[1][0]*float64(x) + invM[1][1]*float64(y) + invM[1][2]) / w
+
+			if srcX >= 0 && srcX < float64(bounds.Dx()) &&
+				srcY >= 0 && srcY < float64(bounds.Dy()) {
+				newImg.Set(x, y, bilinearInterpolation(img, srcX, srcY))
+			} else {
+				newImg.Set(x, y, color.RGBA{0, 0, 0, 255}) // 背景黑色
+			}
+		}
+	}
+	return newImg
+}
+
+func case21() {
+	src := getTestImg()
+
+	rgbaImg := image.NewRGBA(src.Bounds())
+	draw.Draw(rgbaImg, rgbaImg.Bounds(), src, image.Point{}, draw.Src)
+
+	translated := translate(rgbaImg, 50, 30)
+	scaled := scale(rgbaImg, 0.5, 0.5)
+	rotated := rotate(rgbaImg, math.Pi/4)
+
+	outputFileName1 := "output_case21-1.jpg"
+	outputFile1, err := os.Create(outputFileName1)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile1.Close()
+	err = jpeg.Encode(outputFile1, translated, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+	outputFileName2 := "output_case21-2.jpg"
+	outputFile2, err := os.Create(outputFileName2)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile2.Close()
+	err = jpeg.Encode(outputFile2, scaled, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+	outputFileName3 := "output_case21-3.jpg"
+	outputFile3, err := os.Create(outputFileName3)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile3.Close()
+	err = jpeg.Encode(outputFile3, rotated, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// 例子效果失败
+
+// case22 实现基于三角形区域变换的图像变形
+
+// 定义三角形及其相关的辅助函数
+type Point struct {
+	X, Y float64
+}
+
+type Triangle struct {
+	P1, P2, P3 Point
+}
+
+// 仿射变换矩阵计算  根据源三角形和目标三角形计算仿射变换矩阵。
+func computeAffineTransform(src, dst Triangle) [2][3]float64 {
+	x1, y1 := src.P1.X, src.P1.Y
+	x2, y2 := src.P2.X, src.P2.Y
+	x3, y3 := src.P3.X, src.P3.Y
+
+	u1, v1 := dst.P1.X, dst.P1.Y
+	u2, v2 := dst.P2.X, dst.P2.Y
+	u3, v3 := dst.P3.X, dst.P3.Y
+
+	// 计算仿射变换矩阵
+	det := (y2-y3)*(x1-x3) + (x3-x2)*(y1-y3)
+	if det == 0 {
+		return [2][3]float64{}
+	}
+
+	a11 := ((v2-v3)*(x1-x3) + (u3-u2)*(y1-y3)) / det
+	a21 := ((v3-v1)*(x1-x3) + (u1-u3)*(y1-y3)) / det
+	a12 := ((y2-y3)*(u1-u3) + (x3-x2)*(v1-v3)) / det
+	a22 := ((y3-y1)*(u1-u3) + (x1-x3)*(v1-v3)) / det
+	b1 := u1 - a11*x1 - a12*y1
+	b2 := v1 - a21*x1 - a22*y1
+
+	return [2][3]float64{
+		{a11, a12, b1},
+		{a21, a22, b2},
+	}
+}
+
+// 判断点是否在三角形内  使用重心坐标法判断一个点是否在三角形内。
+func isPointInTriangle(p Point, t Triangle) bool {
+	v0 := Point{t.P3.X - t.P1.X, t.P3.Y - t.P1.Y}
+	v1 := Point{t.P2.X - t.P1.X, t.P2.Y - t.P1.Y}
+	v2 := Point{p.X - t.P1.X, p.Y - t.P1.Y}
+
+	dot00 := v0.X*v0.X + v0.Y*v0.Y
+	dot01 := v0.X*v1.X + v0.Y*v1.Y
+	dot02 := v0.X*v2.X + v0.Y*v2.Y
+	dot11 := v1.X*v1.X + v1.Y*v1.Y
+	dot12 := v1.X*v2.X + v1.Y*v2.Y
+
+	invDenom := 1.0 / (dot00*dot11 - dot01*dot01)
+	u := (dot11*dot02 - dot01*dot12) * invDenom
+	v := (dot00*dot12 - dot01*dot02) * invDenom
+
+	return (u >= 0) && (v >= 0) && (u+v < 1)
+}
+
+// 三角形区域变换  对每个三角形区域进行仿射变换并绘制到目标图像中
+func transformTriangle(img *image.RGBA, srcTri, dstTri Triangle, newImg *image.RGBA) {
+	matrix := computeAffineTransform(srcTri, dstTri)
+
+	for y := newImg.Bounds().Min.Y; y < newImg.Bounds().Max.Y; y++ {
+		for x := newImg.Bounds().Min.X; x < newImg.Bounds().Max.X; x++ {
+			p := Point{float64(x), float64(y)}
+			if isPointInTriangle(p, dstTri) {
+				srcX := matrix[0][0]*float64(x) + matrix[0][1]*float64(y) + matrix[0][2]
+				srcY := matrix[1][0]*float64(x) + matrix[1][1]*float64(y) + matrix[1][2]
+
+				if srcX >= 0 && srcX < float64(img.Bounds().Dx()) &&
+					srcY >= 0 && srcY < float64(img.Bounds().Dy()) {
+					newImg.Set(x, y, bilinearInterpolation(img, srcX, srcY))
+				} else {
+					newImg.Set(x, y, color.RGBA{0, 0, 0, 255}) // 背景黑色
+				}
+			}
+		}
+	}
+}
+
+func case22() {
+	src := getTest2Img()
+
+	rgbaImg := image.NewRGBA(src.Bounds())
+	draw.Draw(rgbaImg, rgbaImg.Bounds(), src, image.Point{}, draw.Src)
+
+	// 定义源三角形和目标三角形
+	srcTri := Triangle{
+		Point{100, 100}, Point{200, 100}, Point{150, 200},
+	}
+	dstTri := Triangle{
+		Point{150, 100}, Point{250, 150}, Point{200, 250},
+	}
+
+	// 创建输出图像
+	newImg := image.NewRGBA(rgbaImg.Bounds())
+
+	// 应用三角形变换
+	transformTriangle(rgbaImg, srcTri, dstTri, newImg)
+
+	outputFileName := "output_case22.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, newImg, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
 
 // todo 调整色相 调整饱和度 调整明暗度 调整色彩平衡 调整亮度 调整对比度 调整锐度 调整色阶 调整曝光度 调整色温 调整色调 锐化  降噪  模糊
