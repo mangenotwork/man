@@ -9,8 +9,10 @@ import (
 	"image/png"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -54,7 +56,34 @@ func main() {
 
 	// case21()
 
-	case22()
+	// case22()
+
+	// case23()
+
+	// case24()
+
+	// case25()
+
+	// case26()
+
+	// case27()
+
+	// case28()
+
+	// case29()
+
+	// case30()
+
+	// case31()
+
+	// case32()
+
+	// case33()
+
+	// case34()
+
+	case35()
+
 }
 
 func getTestImg() image.Image {
@@ -93,6 +122,35 @@ func getTest2Img() image.Image {
 	filePath := "./test2.jpg"
 
 	// 打开图像文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filePath[strings.LastIndex(filePath, ".")+1:])
+
+	var img image.Image
+
+	// 解码图像
+	switch ext {
+	case "jpg", "jpeg":
+		img, err = jpeg.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case "png":
+		img, err = png.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("Unsupported image format: %s", ext)
+	}
+	return img
+}
+
+func getImg(filePath string) image.Image {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatal(err)
@@ -1601,4 +1659,857 @@ func case22() {
 
 // ========================================================================
 
-// todo 调整色相 调整饱和度 调整明暗度 调整色彩平衡 调整亮度 调整对比度 调整锐度 调整色阶 调整曝光度 调整色温 调整色调 锐化  降噪  模糊
+// case23 对图像指定区域进行马赛克处理
+
+func case23() {
+	src := getTest2Img()
+
+	// 创建一个可绘制的图像副本
+	bounds := src.Bounds()
+	drawImg := image.NewRGBA(bounds)
+	draw.Draw(drawImg, bounds, src, bounds.Min, draw.Src)
+
+	// 指定马赛克区域和块大小
+	x, y := 100, 100
+	width, height := 800, 400
+	blockSize := 64
+
+	// 对指定区域进行马赛克处理
+	for i := y; i < y+height; i += blockSize {
+		for j := x; j < x+width; j += blockSize {
+			var r, g, b, a uint32
+			count := 0
+			for m := 0; m < blockSize; m++ {
+				for n := 0; n < blockSize; n++ {
+					if i+m < y+height && j+n < x+width {
+						pr, pg, pb, pa := drawImg.At(j+n, i+m).RGBA()
+						r += pr
+						g += pg
+						b += pb
+						a += pa
+						count++
+					}
+				}
+			}
+			if count > 0 {
+				r /= uint32(count)
+				g /= uint32(count)
+				b /= uint32(count)
+				a /= uint32(count)
+				c := color.RGBA64{uint16(r), uint16(g), uint16(b), uint16(a)}
+				for m := 0; m < blockSize; m++ {
+					for n := 0; n < blockSize; n++ {
+						if i+m < y+height && j+n < x+width {
+							drawImg.Set(j+n, i+m, c)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	outputFileName := "output_case23.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, drawImg, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ========================================================================
+
+// case24 图像浮雕效果
+
+func case24() {
+	src := getTest2Img()
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := 0; y < height-1; y++ {
+		for x := 0; x < width-1; x++ {
+			currentPixel := src.At(x, y)
+			nextPixel := src.At(x+1, y+1)
+
+			r1, g1, b1, _ := currentPixel.RGBA()
+			r2, g2, b2, _ := nextPixel.RGBA()
+
+			r := int(r1/256) - int(r2/256) + 128
+			g := int(g1/256) - int(g2/256) + 128
+			b := int(b1/256) - int(b2/256) + 128
+
+			if r < 0 {
+				r = 0
+			} else if r > 255 {
+				r = 255
+			}
+			if g < 0 {
+				g = 0
+			} else if g > 255 {
+				g = 255
+			}
+			if b < 0 {
+				b = 0
+			} else if b > 255 {
+				b = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(r), uint8(g), uint8(b), 255})
+		}
+	}
+
+	outputFileName := "output_case24.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// case25 彩色图像的平滑处理
+// 平滑滤波可以使图像模糊，从而减少图像中的细节，使图像变得柔和。
+
+func case25() {
+	src := getTest2Img()
+
+	// 定义平滑处理的核大小
+	kernelSize := 3
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	halfKernel := kernelSize / 2
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			var rSum, gSum, bSum, count int
+			for ky := -halfKernel; ky <= halfKernel; ky++ {
+				for kx := -halfKernel; kx <= halfKernel; kx++ {
+					nx := x + kx
+					ny := y + ky
+					if nx >= 0 && nx < width && ny >= 0 && ny < height {
+						r, g, b, _ := src.At(nx, ny).RGBA()
+						rSum += int(r / 256)
+						gSum += int(g / 256)
+						bSum += int(b / 256)
+						count++
+					}
+				}
+			}
+			if count > 0 {
+				r := uint8(rSum / count)
+				g := uint8(gSum / count)
+				b := uint8(bSum / count)
+				result.Set(x, y, color.RGBA{r, g, b, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case25.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// case26 图像的锐化处理
+// 锐化的主要目的是突出图像的边缘和细节，使图像变得清晰。
+
+func case26() {
+	src := getTest2Img()
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			var rSum, gSum, bSum int
+			for ky := 0; ky < 3; ky++ {
+				for kx := 0; kx < 3; kx++ {
+					nx := x + kx - 1
+					ny := y + ky - 1
+					r, g, b, _ := src.At(nx, ny).RGBA()
+					factor := laplacianKernel[ky][kx]
+					rSum += int(r/256) * factor
+					gSum += int(g/256) * factor
+					bSum += int(b/256) * factor
+				}
+			}
+			// 获取当前像素的原始值
+			r0, g0, b0, _ := src.At(x, y).RGBA()
+			r0 = r0 / 256
+			g0 = g0 / 256
+			b0 = b0 / 256
+
+			// 计算锐化后的颜色值
+			r := int(r0) + rSum
+			g := int(g0) + gSum
+			b := int(b0) + bSum
+
+			// 确保颜色值在 0 到 255 之间
+			if r < 0 {
+				r = 0
+			} else if r > 255 {
+				r = 255
+			}
+			if g < 0 {
+				g = 0
+			} else if g > 255 {
+				g = 255
+			}
+			if b < 0 {
+				b = 0
+			} else if b > 255 {
+				b = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(r), uint8(g), uint8(b), 255})
+		}
+	}
+
+	outputFileName := "output_case26.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// 拉普拉斯算子核
+var laplacianKernel = [3][3]int{
+	{0, -1, 0},
+	{-1, 4, -1},
+	{0, -1, 0},
+}
+
+// ========================================================================
+
+// case27  彩色图像的分割
+// 彩色图像分割有多种方法，除了之前提到的基于阈值的分割; 该例子 基于 K - Means 聚类算法的彩色图像分割
+
+func case27() {
+	src := getTest2Img()
+
+	// 设定聚类的类别数和最大迭代次数
+	k := 3
+	maxIterations := 100
+
+	// 进行图像分割
+	segmentedImg := Segment(src, k, maxIterations)
+
+	outputFileName := "output_case27.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, segmentedImg, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Point 表示 RGB 颜色空间中的一个点
+type Point27 [3]float64
+
+// distance 计算两个点之间的欧几里得距离
+func distance(p1, p2 Point27) float64 {
+	return math.Sqrt(math.Pow(p1[0]-p2[0], 2) + math.Pow(p1[1]-p2[1], 2) + math.Pow(p1[2]-p2[2], 2))
+}
+
+// kMeans 实现 K - Means 聚类算法
+func kMeans(points []Point27, k int, maxIterations int) ([]int, []Point27) {
+	rand.Seed(time.Now().UnixNano())
+	centers := make([]Point27, k)
+	for i := range centers {
+		centers[i] = points[rand.Intn(len(points))]
+	}
+
+	labels := make([]int, len(points))
+	for iter := 0; iter < maxIterations; iter++ {
+		// 分配点到最近的中心
+		for i, p := range points {
+			minDist := math.MaxFloat64
+			for j, c := range centers {
+				dist := distance(p, c)
+				if dist < minDist {
+					minDist = dist
+					labels[i] = j
+				}
+			}
+		}
+
+		// 更新中心
+		newCenters := make([]Point27, k)
+		counts := make([]int, k)
+		for i, label := range labels {
+			newCenters[label][0] += points[i][0]
+			newCenters[label][1] += points[i][1]
+			newCenters[label][2] += points[i][2]
+			counts[label]++
+		}
+		for i := range newCenters {
+			if counts[i] > 0 {
+				newCenters[i][0] /= float64(counts[i])
+				newCenters[i][1] /= float64(counts[i])
+				newCenters[i][2] /= float64(counts[i])
+			}
+		}
+
+		// 检查是否收敛
+		converged := true
+		for i := range centers {
+			if distance(centers[i], newCenters[i]) > 1e-6 {
+				converged = false
+				break
+			}
+		}
+		if converged {
+			break
+		}
+		centers = newCenters
+	}
+	return labels, centers
+}
+
+// Segment 函数使用 K - Means 进行图像分割
+func Segment(img image.Image, k int, maxIterations int) draw.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	points := make([]Point27, 0, width*height)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			points = append(points, Point27{float64(r / 256), float64(g / 256), float64(b / 256)})
+		}
+	}
+
+	labels, centers := kMeans(points, k, maxIterations)
+
+	result := image.NewRGBA(bounds)
+	index := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			label := labels[index]
+			center := centers[label]
+			r := uint8(center[0])
+			g := uint8(center[1])
+			b := uint8(center[2])
+			result.Set(x, y, color.RGBA{r, g, b, 255})
+			index++
+		}
+	}
+	return result
+}
+
+// ========================================================================
+
+// case28 彩色图像的边缘提取
+// 采用 Sobel 算子进行边缘提取，Sobel 算子是一种常用的边缘检测算子，能分别计算图像在水平和垂直方向上的梯度，从而检测出图像的边缘
+
+func case28() {
+	src := getTest2Img()
+
+	// Sobel 算子的水平和垂直核
+	var sobelX = [3][3]int{
+		{-1, 0, 1},
+		{-2, 0, 2},
+		{-1, 0, 1},
+	}
+
+	var sobelY = [3][3]int{
+		{-1, -2, -1},
+		{0, 0, 0},
+		{1, 2, 1},
+	}
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			var gxR, gyR, gxG, gyG, gxB, gyB int
+			// 计算水平和垂直方向的梯度
+			for ky := 0; ky < 3; ky++ {
+				for kx := 0; kx < 3; kx++ {
+					nx := x + kx - 1
+					ny := y + ky - 1
+					r, g, b, _ := src.At(nx, ny).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+					gxR += int(r) * sobelX[ky][kx]
+					gyR += int(r) * sobelY[ky][kx]
+					gxG += int(g) * sobelX[ky][kx]
+					gyG += int(g) * sobelY[ky][kx]
+					gxB += int(b) * sobelX[ky][kx]
+					gyB += int(b) * sobelY[ky][kx]
+				}
+			}
+			// 计算梯度幅值
+			gradR := math.Sqrt(float64(gxR*gxR + gyR*gyR))
+			gradG := math.Sqrt(float64(gxG*gxG + gyG*gyG))
+			gradB := math.Sqrt(float64(gxB*gxB + gyB*gyB))
+
+			// 确保梯度幅值在 0 到 255 之间
+			if gradR > 255 {
+				gradR = 255
+			}
+			if gradG > 255 {
+				gradG = 255
+			}
+			if gradB > 255 {
+				gradB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(gradR), uint8(gradG), uint8(gradB), 255})
+		}
+	}
+
+	outputFileName := "output_case28.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ========================================================================
+
+// case29 图像颜色反转
+
+func case29() {
+	src := getTest2Img()
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			// 将颜色值转换为 0 - 255 范围
+			r = r / 256
+			g = g / 256
+			b = b / 256
+			a = a / 256
+
+			// 反转颜色
+			r = 255 - r
+			g = 255 - g
+			b = 255 - b
+
+			result.Set(x, y, color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case29.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ========================================================================
+
+// case30 图像腐蚀
+// 如果输入是彩色图像，可能需要先进行二值化处理
+
+func case30() {
+	//src := getTest2Img()
+
+	src := getImg("./output_case19.jpg")
+
+	result := case30_1(src)
+
+	outputFileName := "output_case30.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// 图像腐蚀
+func case30_1(src image.Image) image.Image {
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 3x3 结构元素
+	structuringElement := [3][3]bool{
+		{true, true, true},
+		{true, true, true},
+		{true, true, true},
+	}
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			allForeground := true
+			for ky := 0; ky < 3; ky++ {
+				for kx := 0; kx < 3; kx++ {
+					if structuringElement[ky][kx] {
+						nx := x + kx - 1
+						ny := y + ky - 1
+						r, _, _, _ := src.At(nx, ny).RGBA()
+						if r/256 < 128 {
+							allForeground = false
+							break
+						}
+					}
+				}
+				if !allForeground {
+					break
+				}
+			}
+			if allForeground {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return result
+}
+
+// ========================================================================
+
+// case31 图像膨胀
+// 如果是彩色图像，建议先进行二值化处理再进行膨胀操作，以达到更好的效果。
+
+func case31() {
+	src := getImg("./output_case19.jpg")
+
+	result := case31_1(src)
+
+	outputFileName := "output_case31.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// 图像膨胀
+func case31_1(src image.Image) image.Image {
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 3x3 结构元素
+	structuringElement := [3][3]bool{
+		{true, true, true},
+		{true, true, true},
+		{true, true, true},
+	}
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			anyForeground := false
+			for ky := 0; ky < 3; ky++ {
+				for kx := 0; kx < 3; kx++ {
+					if structuringElement[ky][kx] {
+						nx := x + kx - 1
+						ny := y + ky - 1
+						r, _, _, _ := src.At(nx, ny).RGBA()
+						if r/256 >= 128 {
+							anyForeground = true
+							break
+						}
+					}
+				}
+				if anyForeground {
+					break
+				}
+			}
+			if anyForeground {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return result
+}
+
+// ========================================================================
+
+// case32 图像的开运算
+// 图像的开运算（Opening）是一种形态学操作，它是先对图像进行腐蚀操作，然后再进行膨胀操作。开运算可以去除图像中的小物体、分离物体以及平滑物体的边界
+
+func case32() {
+	src := getImg("./output_case30.jpg")
+
+	result := case31_1(src)
+
+	outputFileName := "output_case32.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ========================================================================
+
+// case33 图像的闭运算
+// 图像的闭运算（Closing）是一种形态学操作，它是先对图像进行膨胀操作，然后再进行腐蚀操作。闭运算常用于填充物体内的小孔、连接邻近的物体等。
+
+func case33() {
+	src := getImg("./output_case19.jpg")
+
+	result := case31_1(src)
+
+	result = case30_1(result)
+
+	outputFileName := "output_case33.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ========================================================================
+
+// case34 图像的内边界提取
+// 图像的内边界提取可以通过图像腐蚀操作与原图像做差来实现
+// 若输入是彩色图像，可能需要先进行二值化处理
+
+func case34() {
+	src := getImg("./output_case19.jpg")
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 先对图像进行腐蚀操作
+	erodedImg := case30_1(src)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r1, g1, b1, a1 := src.At(x, y).RGBA()
+			r2, g2, b2, a2 := erodedImg.At(x, y).RGBA()
+
+			r1 = r1 / 256
+			g1 = g1 / 256
+			b1 = b1 / 256
+			a1 = a1 / 256
+
+			r2 = r2 / 256
+			g2 = g2 / 256
+			b2 = b2 / 256
+			a2 = a2 / 256
+
+			// 通过原图像与腐蚀后的图像做差提取内边界
+			if r1 > 128 && r2 < 128 {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case34.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// case35 图像的外边界提取
+// 图像的外边界提取可以通过对图像进行膨胀操作，然后将膨胀后的图像与原图像做差来实现
+// 若输入是彩色图像，可能需要先进行二值化处理
+
+func case35() {
+	src := getImg("./output_case19.jpg")
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 先对图像进行膨胀操作
+	dilatedImg := case31_1(src)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r1, g1, b1, a1 := src.At(x, y).RGBA()
+			r2, g2, b2, a2 := dilatedImg.At(x, y).RGBA()
+
+			r1 = r1 / 256
+			g1 = g1 / 256
+			b1 = b1 / 256
+			a1 = a1 / 256
+
+			r2 = r2 / 256
+			g2 = g2 / 256
+			b2 = b2 / 256
+			a2 = a2 / 256
+
+			// 通过膨胀后的图像与原图像做差提取外边界
+			if r2 > 128 && r1 < 128 {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case35.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// todo case36 利用均值迭代阀值分割法分割图像
+
+// ========================================================================
+
+// todo case37 最大类间方差法分割法分割图像
+
+// ========================================================================
+
+// todo case38 自适应阀值分割法分割图像
+
+// ========================================================================
+
+// todo case39 最大熵分割法分割图像
+
+// ========================================================================
+
+// todo case40 图像调整色相
+
+// ========================================================================
+
+// todo case41 图像调整饱和度
+
+// ========================================================================
+
+// todo case42 图像调整明暗度
+
+// ========================================================================
+
+// todo case43 调整色彩平衡
+
+// ========================================================================
+
+// todo case44 调整亮度
+
+// ========================================================================
+
+// todo case45 调整对比度
+
+// ========================================================================
+
+// todo case46 调整锐度
+
+// ========================================================================
+
+// todo case47 调整色阶
+
+// ========================================================================
+
+// todo case48 调整曝光度
+
+// ========================================================================
+
+// todo case49 调整色温
+
+// ========================================================================
+
+// todo case50 调整色调
+
+// ========================================================================
+
+// todo case51 图像降噪
+
+// ========================================================================
+
+// todo case52 图像模糊
+
+// ========================================================================
+
+// todo case53 抠图实现
+
+// ========================================================================
