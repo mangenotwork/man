@@ -82,8 +82,47 @@ func main() {
 
 	// case34()
 
-	case35()
+	// case35()
 
+	// case36()
+
+	// case37()
+
+	// case38()
+
+	// case39()
+
+	// case40()
+
+	// case41()
+
+	// case42()
+
+	// case43()
+
+	// case44()
+
+	// case45()
+
+	// case46()
+
+	// case47()
+
+	// case48()
+
+	// case49()
+
+	// case50()
+
+	// case51()
+
+	// case52()
+
+	// case53()
+
+	// case54()
+
+	// case55()
 }
 
 func getTestImg() image.Image {
@@ -2442,74 +2481,1672 @@ func case35() {
 
 // ========================================================================
 
-// todo case36 利用均值迭代阀值分割法分割图像
+// case36 利用均值迭代阀值分割法分割图像
+// 均值迭代阈值分割法是一种自动确定图像分割阈值的方法，其基本思想是通过迭代计算，不断更新阈值，直到阈值收敛
+// 如果输入是彩色图像，需要先将其转换为灰度图像
+
+func case36() {
+	src := getImg("./output_case18.jpg")
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 初始化阈值
+	var threshold uint8 = 128
+	var newThreshold uint8
+	var diff float64 = 1.0
+
+	for diff > 0.5 {
+		var sum1, sum2 int
+		var count1, count2 int
+
+		// 遍历图像像素，根据当前阈值将像素分为两类
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				r, _, _, _ := src.At(x, y).RGBA()
+				gray := uint8(r / 256)
+
+				if gray <= threshold {
+					sum1 += int(gray)
+					count1++
+				} else {
+					sum2 += int(gray)
+					count2++
+				}
+			}
+		}
+
+		// 计算两类像素的平均灰度值
+		var mean1, mean2 float64
+		if count1 > 0 {
+			mean1 = float64(sum1) / float64(count1)
+		}
+		if count2 > 0 {
+			mean2 = float64(sum2) / float64(count2)
+		}
+
+		// 计算新的阈值
+		newThreshold = uint8((mean1 + mean2) / 2)
+
+		// 计算阈值的差值
+		diff = float64(newThreshold) - float64(threshold)
+		if diff < 0 {
+			diff = -diff
+		}
+
+		// 更新阈值
+		threshold = newThreshold
+	}
+
+	// 根据最终阈值进行图像分割
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := uint8(r / 256)
+
+			if gray <= threshold {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			} else {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case36.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case37 最大类间方差法分割法分割图像
+// case37 最大类间方差法分割法分割图像
+// 最大类间方差法（Otsu 算法）是一种常用的图像阈值分割方法，它通过最大化类间方差来自动确定一个最优的阈值，将图像分为前景和背景两部分
+// 如果输入是彩色图像，需要先将其转换为灰度图像
+
+func case37() {
+	src := getImg("./output_case18.jpg")
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 统计每个灰度级的像素数量
+	histogram := [256]int{}
+	totalPixels := width * height
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := uint8(r / 256)
+			histogram[gray]++
+		}
+	}
+
+	// 初始化最大类间方差和最优阈值
+	var maxVariance float64
+	var optimalThreshold uint8
+
+	// 遍历所有可能的阈值
+	for t := 0; t < 256; t++ {
+		var w0, w1, u0, u1, sum0, sum1, count0, count1 int
+
+		// 计算前景和背景的像素数量和灰度值总和
+		for i := 0; i < t; i++ {
+			count0 += histogram[i]
+			sum0 += i * histogram[i]
+		}
+		for i := t; i < 256; i++ {
+			count1 += histogram[i]
+			sum1 += i * histogram[i]
+		}
+
+		// 避免除零错误
+		if count0 == 0 || count1 == 0 {
+			continue
+		}
+
+		// 计算前景和背景的概率
+		w0 = count0 * 100 / totalPixels
+		w1 = count1 * 100 / totalPixels
+
+		// 计算前景和背景的平均灰度值
+		u0 = sum0 / count0
+		u1 = sum1 / count1
+
+		// 计算类间方差
+		variance := float64(w0*w1) * float64(u0-u1) * float64(u0-u1)
+
+		// 更新最大类间方差和最优阈值
+		if variance > maxVariance {
+			maxVariance = variance
+			optimalThreshold = uint8(t)
+		}
+	}
+
+	// 根据最优阈值进行图像分割
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := uint8(r / 256)
+
+			if gray <= optimalThreshold {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			} else {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case37.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case38 自适应阀值分割法分割图像
+// case38 自适应阀值分割法分割图像
+// 自适应阈值分割法是一种根据图像局部区域的特性来确定每个像素的阈值，从而实现图像分割的方法
+// 若输入是彩色图像，需要先将其转换为灰度图像
+
+func case38() {
+	src := getImg("./output_case18.jpg")
+
+	// 设置局部块大小和常数 C
+	blockSize := 15
+	C := 5
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 遍历图像的每个像素
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// 计算局部区域的边界
+			xStart := x - blockSize/2
+			if xStart < bounds.Min.X {
+				xStart = bounds.Min.X
+			}
+			xEnd := x + blockSize/2
+			if xEnd >= bounds.Max.X {
+				xEnd = bounds.Max.X - 1
+			}
+			yStart := y - blockSize/2
+			if yStart < bounds.Min.Y {
+				yStart = bounds.Min.Y
+			}
+			yEnd := y + blockSize/2
+			if yEnd >= bounds.Max.Y {
+				yEnd = bounds.Max.Y - 1
+			}
+
+			// 计算局部区域的像素灰度值总和
+			var sum int
+			var count int
+			for j := yStart; j <= yEnd; j++ {
+				for i := xStart; i <= xEnd; i++ {
+					r, _, _, _ := src.At(i, j).RGBA()
+					gray := uint8(r / 256)
+					sum += int(gray)
+					count++
+				}
+			}
+
+			// 计算局部区域的平均灰度值
+			localMean := sum / count
+
+			// 获取当前像素的灰度值
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := uint8(r / 256)
+
+			// 根据局部平均灰度值和常数 C 确定阈值
+			threshold := localMean - C
+
+			// 根据阈值进行分割
+			if int(gray) <= threshold {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			} else {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case38.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case39 最大熵分割法分割图像
+// case39 最大熵分割法分割图像
+// 最大熵分割法是基于图像灰度直方图，通过最大化前景和背景的熵之和来确定最佳分割阈值的方法
+// 若输入是彩色图像，需要先将其转换为灰度图像
+
+func case39() {
+	src := getImg("./output_case18.jpg")
+
+	// 计算熵的函数
+	entropy := func(histogram []float64) float64 {
+		var ent float64
+		for _, p := range histogram {
+			if p > 0 {
+				ent -= p * math.Log(p)
+			}
+		}
+		return ent
+	}
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 统计灰度直方图
+	histogram := make([]int, 256)
+	totalPixels := width * height
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := int(r / 256)
+			histogram[gray]++
+		}
+	}
+
+	// 计算概率分布
+	prob := make([]float64, 256)
+	for i := 0; i < 256; i++ {
+		prob[i] = float64(histogram[i]) / float64(totalPixels)
+	}
+
+	// 寻找最大熵对应的阈值
+	var maxEntropy float64
+	var optimalThreshold int
+	for t := 0; t < 256; t++ {
+		// 前景和背景的概率分布
+		foreProb := prob[:t+1]
+		backProb := prob[t+1:]
+
+		// 计算前景和背景的熵
+		foreEntropy := entropy(foreProb)
+		backEntropy := entropy(backProb)
+
+		// 计算总熵
+		totalEntropy := foreEntropy + backEntropy
+
+		if totalEntropy > maxEntropy {
+			maxEntropy = totalEntropy
+			optimalThreshold = t
+		}
+	}
+
+	// 根据最优阈值进行图像分割
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, _, _, _ := src.At(x, y).RGBA()
+			gray := int(r / 256)
+			if gray <= optimalThreshold {
+				result.Set(x, y, color.RGBA{0, 0, 0, 255})
+			} else {
+				result.Set(x, y, color.RGBA{255, 255, 255, 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case39.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case40 图像调整色相
+// case40 图像调整色相
+// 要实现图像色相的调整，可以通过将 RGB 颜色空间转换为 HSV（Hue, Saturation, Value）颜色空间，调整色相（Hue）值后再转换回 RGB 颜色空间
+
+func case40() {
+	src := getTest2Img()
+
+	// 定义色相调整值（可以根据需要修改）
+	hueAdjustment := 44.0
+
+	// RGBToHSV 将 RGB 颜色转换为 HSV 颜色
+	RGBToHSV := func(r, g, b uint8) (float64, float64, float64) {
+		rNorm := float64(r) / 255.0
+		gNorm := float64(g) / 255.0
+		bNorm := float64(b) / 255.0
+		maxVal := math.Max(rNorm, math.Max(gNorm, bNorm))
+		minVal := math.Min(rNorm, math.Min(gNorm, bNorm))
+		delta := maxVal - minVal
+
+		var h, s, v float64
+		v = maxVal
+
+		if delta == 0 {
+			h = 0
+		} else {
+			s = delta / maxVal
+			if maxVal == rNorm {
+				h = math.Mod((gNorm-bNorm)/delta, 6)
+			} else if maxVal == gNorm {
+				h = (bNorm-rNorm)/delta + 2
+			} else {
+				h = (rNorm-gNorm)/delta + 4
+			}
+			h *= 60
+			if h < 0 {
+				h += 360
+			}
+		}
+		return h, s, v
+	}
+
+	// HSVToRGB 将 HSV 颜色转换为 RGB 颜色
+	HSVToRGB := func(h, s, v float64) (uint8, uint8, uint8) {
+		c := v * s
+		hPrime := h / 60
+		x := c * (1 - math.Abs(math.Mod(hPrime, 2)-1))
+		var r1, g1, b1 float64
+		switch {
+		case 0 <= hPrime && hPrime < 1:
+			r1 = c
+			g1 = x
+			b1 = 0
+		case 1 <= hPrime && hPrime < 2:
+			r1 = x
+			g1 = c
+			b1 = 0
+		case 2 <= hPrime && hPrime < 3:
+			r1 = 0
+			g1 = c
+			b1 = x
+		case 3 <= hPrime && hPrime < 4:
+			r1 = 0
+			g1 = x
+			b1 = c
+		case 4 <= hPrime && hPrime < 5:
+			r1 = x
+			g1 = 0
+			b1 = c
+		case 5 <= hPrime && hPrime < 6:
+			r1 = c
+			g1 = 0
+			b1 = x
+		}
+		m := v - c
+		r := uint8((r1 + m) * 255)
+		g := uint8((g1 + m) * 255)
+		b := uint8((b1 + m) * 255)
+		return r, g, b
+	}
+
+	// AdjustHue 调整图像的色相
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+			h, s, v := RGBToHSV(uint8(r), uint8(g), uint8(b))
+			// 调整色相
+			h = math.Mod(h+hueAdjustment, 360)
+			if h < 0 {
+				h += 360
+			}
+			r1, g1, b1 := HSVToRGB(float64(h), float64(s), float64(v))
+			result.Set(x, y, color.RGBA{r1, g1, b1, uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case40.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case41 图像调整饱和度
+// case41 图像调整饱和度
+// 饱和度调整可以通过将 RGB 颜色空间转换为 HSV 颜色空间，调整饱和度值后再转换回 RGB 颜色空间来完成
+
+func case41() {
+	src := getTest2Img()
+
+	// 定义饱和度调整值（可以根据需要修改）
+	saturationAdjustment := 0.1
+
+	// RGBToHSV 将 RGB 颜色转换为 HSV 颜色
+	RGBToHSV := func(r, g, b uint8) (float64, float64, float64) {
+		rNorm := float64(r) / 255.0
+		gNorm := float64(g) / 255.0
+		bNorm := float64(b) / 255.0
+		maxVal := math.Max(rNorm, math.Max(gNorm, bNorm))
+		minVal := math.Min(rNorm, math.Min(gNorm, bNorm))
+		delta := maxVal - minVal
+
+		var h, s, v float64
+		v = maxVal
+
+		if delta == 0 {
+			h = 0
+		} else {
+			s = delta / maxVal
+			if maxVal == rNorm {
+				h = math.Mod((gNorm-bNorm)/delta, 6)
+			} else if maxVal == gNorm {
+				h = (bNorm-rNorm)/delta + 2
+			} else {
+				h = (rNorm-gNorm)/delta + 4
+			}
+			h *= 60
+			if h < 0 {
+				h += 360
+			}
+		}
+		return h, s, v
+	}
+
+	// HSVToRGB 将 HSV 颜色转换为 RGB 颜色
+	HSVToRGB := func(h, s, v float64) (uint8, uint8, uint8) {
+		c := v * s
+		hPrime := h / 60
+		x := c * (1 - math.Abs(math.Mod(hPrime, 2)-1))
+		var r1, g1, b1 float64
+		switch {
+		case 0 <= hPrime && hPrime < 1:
+			r1 = c
+			g1 = x
+			b1 = 0
+		case 1 <= hPrime && hPrime < 2:
+			r1 = x
+			g1 = c
+			b1 = 0
+		case 2 <= hPrime && hPrime < 3:
+			r1 = 0
+			g1 = c
+			b1 = x
+		case 3 <= hPrime && hPrime < 4:
+			r1 = 0
+			g1 = x
+			b1 = c
+		case 4 <= hPrime && hPrime < 5:
+			r1 = x
+			g1 = 0
+			b1 = c
+		case 5 <= hPrime && hPrime < 6:
+			r1 = c
+			g1 = 0
+			b1 = x
+		}
+		m := v - c
+		r := uint8((r1 + m) * 255)
+		g := uint8((g1 + m) * 255)
+		b := uint8((b1 + m) * 255)
+		return r, g, b
+	}
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+			h, s, v := RGBToHSV(uint8(r), uint8(g), uint8(b))
+
+			// 调整饱和度
+			s += saturationAdjustment
+			if s < 0 {
+				s = 0
+			} else if s > 1 {
+				s = 1
+			}
+
+			r1, g1, b1 := HSVToRGB(h, s, v)
+			result.Set(x, y, color.RGBA{r1, g1, b1, uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case41.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case42 图像调整明暗度
+// case42 图像调整明暗度
+// 图像明暗度调整可以通过简单地对图像中每个像素的 RGB 值进行线性调整来实现
+
+func case42() {
+	src := getTest2Img()
+
+	// 定义明暗度调整值（可以根据需要修改）
+	brightnessAdjustment := -50
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整亮度
+			newR := int(r) + brightnessAdjustment
+			newG := int(g) + brightnessAdjustment
+			newB := int(b) + brightnessAdjustment
+
+			// 确保颜色值在 0 到 255 范围内
+			if newR < 0 {
+				newR = 0
+			} else if newR > 255 {
+				newR = 255
+			}
+			if newG < 0 {
+				newG = 0
+			} else if newG > 255 {
+				newG = 255
+			}
+			if newB < 0 {
+				newB = 0
+			} else if newB > 255 {
+				newB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case42.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case43 调整色彩平衡
+// case43 调整色彩平衡
+// 色彩平衡调整主要是分别对图像中红、绿、蓝三个通道的值进行调整
+
+func case43() {
+	src := getTest2Img()
+
+	// 定义色彩平衡调整值（可以根据需要修改）
+	redAdjustment := 20
+	greenAdjustment := -10
+	blueAdjustment := 30
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整红色通道
+			newR := int(r) + redAdjustment
+			if newR < 0 {
+				newR = 0
+			} else if newR > 255 {
+				newR = 255
+			}
+
+			// 调整绿色通道
+			newG := int(g) + greenAdjustment
+			if newG < 0 {
+				newG = 0
+			} else if newG > 255 {
+				newG = 255
+			}
+
+			// 调整蓝色通道
+			newB := int(b) + blueAdjustment
+			if newB < 0 {
+				newB = 0
+			} else if newB > 255 {
+				newB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case43.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case44 调整亮度
+// case44 调整亮度
+// 要实现图像亮度的调整，可通过对图像每个像素的 RGB 值进行线性变换来达成
+
+func case44() {
+	src := getTest2Img()
+
+	// 定义亮度调整值（可按需修改）
+	brightness := 1.5
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整亮度
+			newR := int(float64(r) * brightness)
+			newG := int(float64(g) * brightness)
+			newB := int(float64(b) * brightness)
+
+			// 确保颜色值在 0 到 255 范围内
+			if newR < 0 {
+				newR = 0
+			} else if newR > 255 {
+				newR = 255
+			}
+			if newG < 0 {
+				newG = 0
+			} else if newG > 255 {
+				newG = 255
+			}
+			if newB < 0 {
+				newB = 0
+			} else if newB > 255 {
+				newB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case44.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case45 调整对比度
+// case45 调整对比度
+// 图像对比度调整，核心思路是通过对图像中每个像素的 RGB 值进行线性变换，将其映射到一个新的范围，从而改变图像的对比度
+
+func case45() {
+
+	src := getTest2Img()
+
+	// 定义对比度调整值（可以根据需要修改）
+	contrast := 50.0
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 对比度调整因子
+	factor := (259 * (contrast + 255)) / (255 * (259 - contrast))
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整对比度
+			newR := int(factor*(float64(r)-128) + 128)
+			newG := int(factor*(float64(g)-128) + 128)
+			newB := int(factor*(float64(b)-128) + 128)
+
+			// 确保颜色值在 0 到 255 范围内
+			if newR < 0 {
+				newR = 0
+			} else if newR > 255 {
+				newR = 255
+			}
+			if newG < 0 {
+				newG = 0
+			} else if newG > 255 {
+				newG = 255
+			}
+			if newB < 0 {
+				newB = 0
+			} else if newB > 255 {
+				newB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case45.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case46 调整锐度
+// case46 调整锐度
+// 图像锐度调整，通常可以使用拉普拉斯算子进行图像锐化处理。拉普拉斯算子是一种二阶导数算子，它可以增强图像中的边缘和细节，从而达到锐化图像的效果
+
+func case46() {
+
+	src := getTest2Img()
+
+	// 定义锐度调整值（可以根据需要修改）
+	sharpness := 0.5
+
+	// 拉普拉斯算子
+	var laplacianKernel = [][]int{
+		{0, -1, 0},
+		{-1, 4, -1},
+		{0, -1, 0},
+	}
+
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			var rSum, gSum, bSum int
+
+			// 应用拉普拉斯算子
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					r, g, b, _ := src.At(x+kx, y+ky).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+
+					kernelValue := laplacianKernel[ky+1][kx+1]
+					rSum += int(r) * kernelValue
+					gSum += int(g) * kernelValue
+					bSum += int(b) * kernelValue
+				}
+			}
+
+			// 获取当前像素的原始值
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整锐度
+			newR := int(r) + int(float64(rSum)*sharpness)
+			newG := int(g) + int(float64(gSum)*sharpness)
+			newB := int(b) + int(float64(bSum)*sharpness)
+
+			// 确保颜色值在 0 到 255 范围内
+			if newR < 0 {
+				newR = 0
+			} else if newR > 255 {
+				newR = 255
+			}
+			if newG < 0 {
+				newG = 0
+			} else if newG > 255 {
+				newG = 255
+			}
+			if newB < 0 {
+				newB = 0
+			} else if newB > 255 {
+				newB = 255
+			}
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	// 处理边缘像素，简单复制原始像素值
+	for y := 0; y < height; y++ {
+		result.Set(0, y, src.At(0, y))
+		result.Set(width-1, y, src.At(width-1, y))
+	}
+	for x := 0; x < width; x++ {
+		result.Set(x, 0, src.At(x, 0))
+		result.Set(x, height-1, src.At(x, height-1))
+	}
+
+	outputFileName := "output_case46.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case47 调整色阶
+// case47 调整色阶
+// 色阶调整是一种通过改变图像中像素的亮度分布来调整图像对比度和颜色的方法。它主要涉及到对图像的暗部、中间调和亮部进行重新映射
+
+func case47() {
+
+	src := getTest2Img()
+
+	// 定义色阶调整值（可以根据需要修改）
+	blackPoint := 30.0
+	whitePoint := 220.0
+	gamma := 1.2
+
+	// adjustChannel 调整单个通道的色阶
+	adjustChannel := func(value, blackPoint, whitePoint, gamma float64) float64 {
+		// 第一步：将输入值限制在黑点和白点之间
+		if value < blackPoint {
+			value = 0
+		} else if value > whitePoint {
+			value = 255
+		} else {
+			// 线性映射到 0 - 255 范围
+			value = (value - blackPoint) / (whitePoint - blackPoint) * 255
+		}
+		// 第二步：应用伽马校正
+		if gamma != 1 {
+			value = 255 * math.Pow(value/255, 1/gamma)
+		}
+		return value
+	}
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整红色通道
+			newR := adjustChannel(float64(r), blackPoint, whitePoint, gamma)
+			// 调整绿色通道
+			newG := adjustChannel(float64(g), blackPoint, whitePoint, gamma)
+			// 调整蓝色通道
+			newB := adjustChannel(float64(b), blackPoint, whitePoint, gamma)
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case47.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case48 调整曝光度
+// case48 调整曝光度
+// 图像曝光度调整，可通过对图像每个像素的 RGB 值进行指数变换来实现
+
+func case48() {
+
+	src := getTest2Img()
+
+	// 定义曝光度调整值（可按需修改）
+	exposure := 0.2
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 调整曝光度
+			newR := int(math.Min(255, math.Max(0, float64(r)*math.Pow(2, exposure))))
+			newG := int(math.Min(255, math.Max(0, float64(g)*math.Pow(2, exposure))))
+			newB := int(math.Min(255, math.Max(0, float64(b)*math.Pow(2, exposure))))
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case48.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case49 调整色温
+// case49 调整色温
+// 图像色温调整，核心思路是通过调整图像中 RGB 颜色通道的比例来模拟不同的色温效果。不同的色温会让图像
+// 呈现出偏暖（如红色、黄色调）或偏冷（如蓝色调）的视觉感受
+
+func case49() {
+
+	src := getTest2Img()
+
+	// 定义色温调整值（可以根据需要修改）
+	temperature := 5000.0
+
+	// calculateColorGains 根据色温计算 RGB 增益
+	calculateColorGains := func(temperature float64) (float64, float64, float64) {
+		temperature = math.Max(1000, math.Min(40000, temperature)) / 100
+		var r, g, b float64
+
+		// 计算红色增益
+		if temperature <= 66 {
+			r = 255
+		} else {
+			r = temperature - 60
+			r = 329.698727446 * math.Pow(r, -0.1332047592)
+			if r < 0 {
+				r = 0
+			}
+			if r > 255 {
+				r = 255
+			}
+		}
+
+		// 计算绿色增益
+		if temperature <= 66 {
+			g = temperature
+			g = 99.4708025861*math.Log(g) - 161.1195681661
+			if g < 0 {
+				g = 0
+			}
+			if g > 255 {
+				g = 255
+			}
+		} else {
+			g = temperature - 60
+			g = 288.1221695283 * math.Pow(g, -0.0755148492)
+			if g < 0 {
+				g = 0
+			}
+			if g > 255 {
+				g = 255
+			}
+		}
+
+		// 计算蓝色增益
+		if temperature >= 66 {
+			b = 255
+		} else {
+			if temperature <= 19 {
+				b = 0
+			} else {
+				b = temperature - 10
+				b = 138.5177312231*math.Log(b) - 305.0447927307
+				if b < 0 {
+					b = 0
+				}
+				if b > 255 {
+					b = 255
+				}
+			}
+		}
+
+		// 归一化增益
+		maxValue := math.Max(r, math.Max(g, b))
+		rGain := r / maxValue
+		gGain := g / maxValue
+		bGain := b / maxValue
+
+		return rGain, gGain, bGain
+	}
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	// 根据色温计算 RGB 增益
+	rGain, gGain, bGain := calculateColorGains(temperature)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 应用 RGB 增益
+			newR := int(math.Min(255, math.Max(0, float64(r)*rGain)))
+			newG := int(math.Min(255, math.Max(0, float64(g)*gGain)))
+			newB := int(math.Min(255, math.Max(0, float64(b)*bGain)))
+
+			result.Set(x, y, color.RGBA{uint8(newR), uint8(newG), uint8(newB), uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case49.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
 
 // ========================================================================
 
-// todo case50 调整色调
+// case50 调整色调
+// 图像色调调整，通常会先把 RGB 颜色空间转换为 HSV（Hue, Saturation, Value）颜色空间，接着调整色相（Hue）值，最后再转换回 RGB 颜色空间
+
+func case50() {
+
+	src := getTest2Img()
+
+	// 定义色调调整值（可以根据需要修改）
+	hueAdjustment := 90.0
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+			h, s, v := RGBToHSV(uint8(r), uint8(g), uint8(b))
+
+			// 调整色调
+			h = math.Mod(h+hueAdjustment, 360)
+			if h < 0 {
+				h += 360
+			}
+
+			r1, g1, b1 := HSVToRGB(h, s, v)
+			result.Set(x, y, color.RGBA{r1, g1, b1, uint8(a)})
+		}
+	}
+
+	outputFileName := "output_case50.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// RGBToHSV 将 RGB 颜色转换为 HSV 颜色
+func RGBToHSV(r, g, b uint8) (float64, float64, float64) {
+	rNorm := float64(r) / 255.0
+	gNorm := float64(g) / 255.0
+	bNorm := float64(b) / 255.0
+	maxVal := math.Max(rNorm, math.Max(gNorm, bNorm))
+	minVal := math.Min(rNorm, math.Min(gNorm, bNorm))
+	delta := maxVal - minVal
+
+	var h, s, v float64
+	v = maxVal
+
+	if delta == 0 {
+		h = 0
+	} else {
+		s = delta / maxVal
+		if maxVal == rNorm {
+			h = math.Mod((gNorm-bNorm)/delta, 6)
+		} else if maxVal == gNorm {
+			h = (bNorm-rNorm)/delta + 2
+		} else {
+			h = (rNorm-gNorm)/delta + 4
+		}
+		h *= 60
+		if h < 0 {
+			h += 360
+		}
+	}
+	return h, s, v
+}
+
+// HSVToRGB 将 HSV 颜色转换为 RGB 颜色
+func HSVToRGB(h, s, v float64) (uint8, uint8, uint8) {
+	c := v * s
+	hPrime := h / 60
+	x := c * (1 - math.Abs(math.Mod(hPrime, 2)-1))
+	var r1, g1, b1 float64
+	switch {
+	case 0 <= hPrime && hPrime < 1:
+		r1 = c
+		g1 = x
+		b1 = 0
+	case 1 <= hPrime && hPrime < 2:
+		r1 = x
+		g1 = c
+		b1 = 0
+	case 2 <= hPrime && hPrime < 3:
+		r1 = 0
+		g1 = c
+		b1 = x
+	case 3 <= hPrime && hPrime < 4:
+		r1 = 0
+		g1 = x
+		b1 = c
+	case 4 <= hPrime && hPrime < 5:
+		r1 = x
+		g1 = 0
+		b1 = c
+	case 5 <= hPrime && hPrime < 6:
+		r1 = c
+		g1 = 0
+		b1 = x
+	}
+	m := v - c
+	r := uint8((r1 + m) * 255)
+	g := uint8((g1 + m) * 255)
+	b := uint8((b1 + m) * 255)
+	return r, g, b
+}
 
 // ========================================================================
 
-// todo case51 图像降噪
+// case51 图像降噪
+// 图像降噪是图像处理中常见的操作，其中高斯模糊是一种简单且常用的降噪方法。通过调整高斯核的大小（即标准差），可以控制降噪的程度
+
+func case51() {
+
+	src := getTest2Img()
+
+	// 定义降噪程度（可以根据需要修改）
+	sigma := 2.0
+
+	// 生成一维高斯核
+	generateGaussianKernel := func(sigma float64) []float64 {
+		size := int(math.Ceil(sigma * 3))
+		kernel := make([]float64, 2*size+1)
+		sum := 0.0
+		for i := -size; i <= size; i++ {
+			kernel[i+size] = math.Exp(-float64(i*i) / (2 * sigma * sigma))
+			sum += kernel[i+size]
+		}
+		// 归一化
+		for i := range kernel {
+			kernel[i] /= sum
+		}
+		return kernel
+	}
+
+	// 一维高斯模糊
+	gaussianBlur1D := func(img image.Image, kernel []float64) draw.Image {
+		bounds := img.Bounds()
+		//width := bounds.Dx()
+		//height := bounds.Dy()
+		result := image.NewRGBA(bounds)
+
+		// 水平方向模糊
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				var rSum, gSum, bSum, aSum float64
+				kernelSize := len(kernel)
+				halfKernelSize := kernelSize / 2
+				for i := -halfKernelSize; i <= halfKernelSize; i++ {
+					newX := x + i
+					if newX < bounds.Min.X {
+						newX = bounds.Min.X
+					} else if newX >= bounds.Max.X {
+						newX = bounds.Max.X - 1
+					}
+					r, g, b, a := img.At(newX, y).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+					rSum += float64(r) * kernel[i+halfKernelSize]
+					gSum += float64(g) * kernel[i+halfKernelSize]
+					bSum += float64(b) * kernel[i+halfKernelSize]
+					aSum += float64(a) * kernel[i+halfKernelSize]
+				}
+				result.Set(x, y, color.RGBA{
+					uint8(rSum),
+					uint8(gSum),
+					uint8(bSum),
+					uint8(aSum),
+				})
+			}
+		}
+
+		// 垂直方向模糊
+		temp := image.NewRGBA(bounds)
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				var rSum, gSum, bSum, aSum float64
+				kernelSize := len(kernel)
+				halfKernelSize := kernelSize / 2
+				for i := -halfKernelSize; i <= halfKernelSize; i++ {
+					newY := y + i
+					if newY < bounds.Min.Y {
+						newY = bounds.Min.Y
+					} else if newY >= bounds.Max.Y {
+						newY = bounds.Max.Y - 1
+					}
+					r, g, b, a := result.At(x, newY).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+					rSum += float64(r) * kernel[i+halfKernelSize]
+					gSum += float64(g) * kernel[i+halfKernelSize]
+					bSum += float64(b) * kernel[i+halfKernelSize]
+					aSum += float64(a) * kernel[i+halfKernelSize]
+				}
+				temp.Set(x, y, color.RGBA{
+					uint8(rSum),
+					uint8(gSum),
+					uint8(bSum),
+					uint8(aSum),
+				})
+			}
+		}
+		return temp
+	}
+
+	// 图像降噪
+	denoiseImage := func(img image.Image, sigma float64) draw.Image {
+		kernel := generateGaussianKernel(sigma)
+		return gaussianBlur1D(img, kernel)
+	}
+
+	result := denoiseImage(src, sigma)
+
+	outputFileName := "output_case51.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case52 图像模糊
+// case52 图像模糊
+// 图像模糊，常见的方法是使用高斯模糊，它通过对图像的每个像素周围的邻域进行加权平均来实现模糊效果，并且可以通过调整高斯核的标准差来控制模糊程度
+
+func case52() {
+
+	src := getTest2Img()
+
+	// 定义模糊程度（可以根据需要修改）
+	sigma := 4.0
+
+	// 生成一维高斯核
+	generateGaussianKernel := func(sigma float64) []float64 {
+		size := int(math.Ceil(sigma * 3))
+		kernel := make([]float64, 2*size+1)
+		sum := 0.0
+		for i := -size; i <= size; i++ {
+			kernel[i+size] = math.Exp(-float64(i*i) / (2 * sigma * sigma))
+			sum += kernel[i+size]
+		}
+		// 归一化
+		for i := range kernel {
+			kernel[i] /= sum
+		}
+		return kernel
+	}
+
+	// 一维高斯模糊
+	gaussianBlur1D := func(img image.Image, kernel []float64) draw.Image {
+		bounds := img.Bounds()
+		//width := bounds.Dx()
+		//height := bounds.Dy()
+		result := image.NewRGBA(bounds)
+
+		// 水平方向模糊
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				var rSum, gSum, bSum, aSum float64
+				kernelSize := len(kernel)
+				halfKernelSize := kernelSize / 2
+				for i := -halfKernelSize; i <= halfKernelSize; i++ {
+					newX := x + i
+					if newX < bounds.Min.X {
+						newX = bounds.Min.X
+					} else if newX >= bounds.Max.X {
+						newX = bounds.Max.X - 1
+					}
+					r, g, b, a := img.At(newX, y).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+					rSum += float64(r) * kernel[i+halfKernelSize]
+					gSum += float64(g) * kernel[i+halfKernelSize]
+					bSum += float64(b) * kernel[i+halfKernelSize]
+					aSum += float64(a) * kernel[i+halfKernelSize]
+				}
+				result.Set(x, y, color.RGBA{
+					uint8(rSum),
+					uint8(gSum),
+					uint8(bSum),
+					uint8(aSum),
+				})
+			}
+		}
+
+		// 垂直方向模糊
+		temp := image.NewRGBA(bounds)
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				var rSum, gSum, bSum, aSum float64
+				kernelSize := len(kernel)
+				halfKernelSize := kernelSize / 2
+				for i := -halfKernelSize; i <= halfKernelSize; i++ {
+					newY := y + i
+					if newY < bounds.Min.Y {
+						newY = bounds.Min.Y
+					} else if newY >= bounds.Max.Y {
+						newY = bounds.Max.Y - 1
+					}
+					r, g, b, a := result.At(x, newY).RGBA()
+					r = r / 256
+					g = g / 256
+					b = b / 256
+					rSum += float64(r) * kernel[i+halfKernelSize]
+					gSum += float64(g) * kernel[i+halfKernelSize]
+					bSum += float64(b) * kernel[i+halfKernelSize]
+					aSum += float64(a) * kernel[i+halfKernelSize]
+				}
+				temp.Set(x, y, color.RGBA{
+					uint8(rSum),
+					uint8(gSum),
+					uint8(bSum),
+					uint8(aSum),
+				})
+			}
+		}
+		return temp
+	}
+
+	// 图像模糊
+	blurImage := func(img image.Image, sigma float64) draw.Image {
+		kernel := generateGaussianKernel(sigma)
+		return gaussianBlur1D(img, kernel)
+	}
+
+	// 模糊处理
+	result := blurImage(src, sigma)
+
+	outputFileName := "output_case52.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
 
-// todo case53 抠图实现
+// case53 抠图实现
+// 实现抠图，有多种方法，这里介绍一种基于简单的颜色阈值的抠图方法，它适用于背景颜色较为单一的图像
+
+func case53() {
+
+	src := getImg("./output_case19.jpg")
+
+	// 定义目标背景颜色和颜色容差
+	targetColor := color.RGBA{255, 255, 255, 255} // 白色背景
+	tolerance := 30
+
+	bounds := src.Bounds()
+	//width := bounds.Dx()
+	//height := bounds.Dy()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+
+			// 计算颜色差值
+			dr := int(r) - int(targetColor.R)
+			dg := int(g) - int(targetColor.G)
+			db := int(b) - int(targetColor.B)
+			diff := dr*dr + dg*dg + db*db
+
+			if diff <= tolerance*tolerance {
+				// 如果颜色差值在阈值范围内，设置为透明
+				result.Set(x, y, color.RGBA{0, 0, 0, 0})
+			} else {
+				// 否则保留原像素颜色
+				result.Set(x, y, color.RGBA{uint8(r), uint8(g), uint8(b), 255})
+			}
+		}
+	}
+
+	outputFileName := "output_case53.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, result, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
 
 // ========================================================================
+
+// case54 调整图像透明度
+// 若要调整图像的透明度，可以遍历图像的每个像素，然后对其 alpha 通道的值进行修改
+// 若输入图像是 JPEG 格式，它本身不支持透明度，即便代码调整了 alpha 通道，保存成 JPEG 时也会丢失透明信息。所以要保证输入图像是支持透明度的格式，如 PNG。
+// 同样，若输出格式为 JPEG，也会丢失透明信息。要把输出格式设为支持透明度的 PNG。
+
+func case54() {
+
+	src := getImg("./test3.png")
+
+	// 定义透明度调整因子（可按需修改）
+	alphaFactor := 0.4
+
+	bounds := src.Bounds()
+	result := image.NewRGBA(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+			r = r / 256
+			g = g / 256
+			b = b / 256
+			a = a / 256
+
+			// 调整 alpha 值
+			newA := uint8(float64(a) * alphaFactor)
+			result.Set(x, y, color.RGBA{uint8(r), uint8(g), uint8(b), newA})
+		}
+	}
+
+	outputFileName := "output_case54.png"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = png.Encode(outputFile, result)
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// ========================================================================
+
+// case55 生成纯色图
+
+func case55() {
+	// 定义图像的宽度和高度
+	width := 800
+	height := 600
+
+	// 定义纯色图的颜色，这里使用红色
+	solidColor := color.RGBA{255, 0, 0, 255}
+
+	// 生成纯色图
+	// 创建一个新的 RGBA 图像
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 遍历图像的每个像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 将每个像素设置为指定的颜色
+			img.Set(x, y, solidColor)
+		}
+	}
+	// 创建输出文件
+	outputFile, err := os.Create("output_case55.png")
+	if err != nil {
+		log.Fatalf("无法创建输出文件: %v", err)
+	}
+	defer outputFile.Close()
+
+	// 将生成的图像保存为 PNG 格式
+	err = png.Encode(outputFile, img)
+	if err != nil {
+		log.Fatalf("无法保存图像: %v", err)
+	}
+
+}
+
+// ========================================================================
+
+// todo gif相关  图片格式转换
