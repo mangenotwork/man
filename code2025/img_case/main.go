@@ -123,6 +123,16 @@ func main() {
 	// case54()
 
 	// case55()
+
+	// case56()
+
+	// case57()
+
+	// case58()
+
+	// case59()
+
+	case60()
 }
 
 func getTestImg() image.Image {
@@ -4146,6 +4156,486 @@ func case55() {
 	}
 
 }
+
+// ========================================================================
+
+// case56 计算两幅图像的余弦相似度
+// 此方法仅适用于尺寸相同的图像。若图像尺寸不同，需先对图像进行缩放处理
+// 基于图像的灰度信息，没有考虑颜色和纹理等更复杂的特征
+
+/*
+使用场景
+
+- 图像检索与识别
+相似图像搜索：在图像数据库中，根据用户提供的查询图像，通过计算余弦相似度来找到与之相似的图像。例如，在百度图片、谷歌图片等搜索引擎中，
+用户上传一张图片，搜索引擎会返回与之相似的图片结果，帮助用户快速找到所需图像。
+图像分类与识别：在图像识别系统中，将待识别图像与预定义的各类别图像特征向量进行余弦相似度计算，以确定该图像属于哪个类别。如在人脸识别
+系统中，通过计算输入人脸图像与数据库中已知人脸图像的余弦相似度，来判断是否为同一人，进而实现身份识别
+
+- 图像质量评估
+判断图像失真程度：通过计算原始图像与处理后图像的余弦相似度，可以评估图像在压缩、滤波、降噪等处理过程中的失真程度。余弦相似度越高，
+说明处理后的图像与原始图像越相似，图像质量损失越小。例如，在评估 JPEG 图像压缩算法对图像质量的影响时，可计算压缩前后图像的余弦相似度来衡量压缩效果。
+比较不同图像处理算法效果：对于同一张图像，使用不同的图像处理算法（如不同的去噪算法）进行处理后，通过计算处理后图像与原始图像的余弦
+相似度，比较不同算法对图像质量的保持能力，从而选择出最适合的算法。
+
+*/
+
+func case56() {
+
+	src1 := getImg("./output_case4.jpg")
+	src2 := getImg("./output_case2.jpg")
+
+	// 将图像转换为灰度向量
+	vec1 := ImageToGrayVector(src1)
+	vec2 := ImageToGrayVector(src2)
+
+	// 计算余弦相似度
+	similarity := CosineSimilarity(vec1, vec2)
+	println("两幅图像的余弦相似度为:", similarity)
+
+}
+
+// ImageToGrayVector 将图像转换为灰度向量
+func ImageToGrayVector(img image.Image) []float64 {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	vector := make([]float64, width*height)
+	index := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			gray := color.GrayModel.Convert(img.At(x, y)).(color.Gray)
+			vector[index] = float64(gray.Y)
+			index++
+		}
+	}
+	return vector
+}
+
+// CosineSimilarity 计算两个向量的余弦相似度
+func CosineSimilarity(vec1, vec2 []float64) float64 {
+	dotProduct := 0.0
+	normVec1 := 0.0
+	normVec2 := 0.0
+	for i := 0; i < len(vec1); i++ {
+		dotProduct += vec1[i] * vec2[i]
+		normVec1 += vec1[i] * vec1[i]
+		normVec2 += vec2[i] * vec2[i]
+	}
+	if normVec1 == 0 || normVec2 == 0 {
+		return 0
+	}
+	return dotProduct / (math.Sqrt(normVec1) * math.Sqrt(normVec2))
+}
+
+// ========================================================================
+
+// 图像相似度计算有哪些方法
+
+/*
+- 欧氏距离  原理：将图像表示为向量，通常是将图像的像素值按一定顺序排列成一维向量。然后计算两个向量在欧氏空间中的距离，距离越小，图像越相似。
+
+- 余弦相似度  原理：将图像向量归一化后，计算两个向量的夹角余弦值。余弦值越接近 1，说明两个向量的方向越相似，即图像越相似。
+
+- 结构相似性指数（SSIM）   原理：从图像的亮度、对比度和结构三个方面来衡量图像的相似性。它通过比较图像的局部块的均值、方差和协方差来评
+估结构信息的相似程度。
+
+- 直方图相似度   原理：统计图像的颜色直方图，即图像中不同颜色值出现的频率。通过比较两张图像的颜色直方图的相似度来衡量图像的相似性。常
+用的直方图相似度计算方法有卡方距离、巴氏距离等。
+
+- 基于特征点匹配的方法  原理：首先检测图像中的特征点，如 SIFT（尺度不变特征变换）、SURF（加速稳健特征）等特征点。然后通过匹配这些特征点来
+计算图像的相似度。通常根据匹配的特征点数量、匹配的准确性等指标来衡量图像的相似程度。
+
+- 深度学习方法  原理：利用深度神经网络，如卷积神经网络（CNN），对图像进行特征提取和表示。将图像输入到预训练的网络中，得到图像的特征向量，然
+后通过计算特征向量之间的距离或相似度来衡量图像的相似性。常见的方法有基于 Siamese 网络、Triplet 网络等的图像相似度计算模型。
+
+*/
+
+// ========================================================================
+
+// 使用感知哈希算法获取图片的“指纹”字符串
+
+/*
+感知哈希算法是一类用于生成图像 “指纹”（即哈希值）的算法，这些 “指纹” 字符串能够以一种紧凑的形式概括图像的感知特征。通过比较这些 “指纹”，
+可以快速判断两幅图像在视觉上是否相似，而无需像传统方法那样对整个图像像素进行逐点比较
+这些算法常用于图像去重、图像检索等领域
+
+均值哈希算法（Average Hash，AHash）
+原理
+图像缩放：将图像缩放到一个固定的尺寸（如 8x8 像素），忽略图像的细节和纵横比，这样可以确保所有图像在相同的尺度下进行比较。
+灰度化：把缩放后的彩色图像转换为灰度图像，简化处理过程。
+计算均值：计算灰度图像中所有像素的平均值。
+生成哈希值：将每个像素的灰度值与平均值进行比较，如果像素的灰度值大于平均值，则该位置的哈希位设为 1，否则设为 0。最终得到一个由 0 和
+1 组成的二进制字符串，这就是图像的 “指纹”。
+
+感知哈希算法（Perceptual Hash，PHash）
+原理
+图像缩放：将图像缩放到一个固定的尺寸（如 32x32 像素），以减少计算量。
+灰度化：将彩色图像转换为灰度图像。
+离散余弦变换（DCT）：对灰度图像进行 DCT 变换，将图像从空间域转换到频率域。DCT 变换可以将图像的能量集中在低频部分，而高频部分则包含图像的细节信息。
+取低频系数：选取 DCT 变换结果的左上角 8x8 区域，这些系数代表了图像的低频特征。
+计算均值：计算选取的 8x8 区域的系数平均值。
+生成哈希值：将每个系数与平均值进行比较，如果系数大于平均值，则该位置的哈希位设为 1，否则设为 0。最终得到一个 64 位的二进制字符串作为图像的 “指纹”。
+
+
+差异哈希算法（Difference Hash，DHash）
+原理
+图像缩放：将图像缩放到一个固定的尺寸（如 9x8 像素）。
+灰度化：将彩色图像转换为灰度图像。
+计算差异：比较相邻像素的灰度值，如果右边像素的灰度值大于左边像素的灰度值，则该位置的哈希位设为 1，否则设为 0。这样可以得到一个 64 位的
+二进制字符串作为图像的 “指纹”。
+
+*/
+
+// ========================================================================
+
+// case57 均值哈希算法获取图像的指纹字符串
+
+func case57() {
+
+	src1 := getImg("./output_case4.jpg")
+	// 计算均值哈希值
+	hash1 := AverageHash(src1)
+	fmt.Println("图像的均值哈希指纹字符串:", hash1)
+
+	src2 := getImg("./output_case5.jpg")
+	// 计算均值哈希值
+	hash2 := AverageHash(src2)
+	fmt.Println("图像的均值哈希指纹字符串:", hash2)
+
+	src3 := getImg("./output_case3.jpg")
+	// 计算均值哈希值
+	hash3 := AverageHash(src3)
+	fmt.Println("图像的均值哈希指纹字符串:", hash3)
+
+	src4 := getImg("./output_case7.jpg")
+	// 计算均值哈希值
+	hash4 := AverageHash(src4)
+	fmt.Println("图像的均值哈希指纹字符串:", hash4)
+}
+
+// AverageHash 计算图像的均值哈希值
+func AverageHash(img image.Image) string {
+	// 缩放图像到 8x8
+	resized := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	draw.NearestNeighbor.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Src, nil)
+
+	// 灰度化并计算像素总和
+	var total int
+	grayPixels := make([]uint8, 64)
+	index := 0
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			r, g, b, _ := resized.At(x, y).RGBA()
+			// 将颜色值转换为 0 - 255 范围
+			r = r >> 8
+			g = g >> 8
+			b = b >> 8
+			gray := uint8((r + g + b) / 3)
+			grayPixels[index] = gray
+			total += int(gray)
+			index++
+		}
+	}
+
+	// 计算平均灰度值
+	average := total / 64
+
+	// 生成哈希值
+	var hashStr string
+	for _, pixel := range grayPixels {
+		if int(pixel) > average {
+			hashStr += "1"
+		} else {
+			hashStr += "0"
+		}
+	}
+
+	return hashStr
+}
+
+// ========================================================================
+
+// case58 感知哈希算法获取图像的指纹字符串
+
+func case58() {
+	src1 := getImg("./output_case4.jpg")
+	// 计算均值哈希值
+	hash1 := pHash(src1)
+	fmt.Println("图像的感知哈希指纹字符串:", hash1)
+
+	src2 := getImg("./output_case5.jpg")
+	// 计算均值哈希值
+	hash2 := pHash(src2)
+	fmt.Println("图像的感知哈希指纹字符串:", hash2)
+
+	src3 := getImg("./output_case3.jpg")
+	// 计算均值哈希值
+	hash3 := pHash(src3)
+	fmt.Println("图像的感知哈希指纹字符串:", hash3)
+
+	src4 := getImg("./output_case7.jpg")
+	// 计算均值哈希值
+	hash4 := pHash(src4)
+	fmt.Println("图像的感知哈希指纹字符串:", hash4)
+}
+
+// 二维离散余弦变换
+func dct2d(data [][]float64) [][]float64 {
+	N := len(data)
+	result := make([][]float64, N)
+	for i := range result {
+		result[i] = make([]float64, N)
+	}
+
+	for u := 0; u < N; u++ {
+		for v := 0; v < N; v++ {
+			var sum float64
+			Cu := 1.0
+			Cv := 1.0
+			for x := 0; x < N; x++ {
+				for y := 0; y < N; y++ {
+					if u == 0 {
+						Cu = 1.0 / math.Sqrt(2)
+					}
+					if v == 0 {
+						Cv = 1.0 / math.Sqrt(2)
+					}
+					sum += data[x][y] * math.Cos((2*float64(x)+1)*float64(u)*math.Pi/(2*float64(N))) *
+						math.Cos((2*float64(y)+1)*float64(v)*math.Pi/(2*float64(N)))
+				}
+			}
+			result[u][v] = 2.0 / float64(N) * Cu * Cv * sum
+		}
+	}
+	return result
+}
+
+// 感知哈希算法
+func pHash(img image.Image) string {
+	// 缩放图像到 32x32
+	resized := image.NewRGBA(image.Rect(0, 0, 32, 32))
+	draw.NearestNeighbor.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Src, nil)
+
+	// 灰度化
+	grayPixels := make([][]float64, 32)
+	for i := range grayPixels {
+		grayPixels[i] = make([]float64, 32)
+	}
+	for y := 0; y < 32; y++ {
+		for x := 0; x < 32; x++ {
+			r, g, b, _ := resized.At(x, y).RGBA()
+			r = r >> 8
+			g = g >> 8
+			b = b >> 8
+			gray := float64(r+g+b) / 3
+			grayPixels[y][x] = gray
+		}
+	}
+
+	// 二维离散余弦变换
+	dctResult := dct2d(grayPixels)
+
+	// 取左上角 8x8 低频分量
+	lowFreq := make([][]float64, 8)
+	for i := range lowFreq {
+		lowFreq[i] = make([]float64, 8)
+	}
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			lowFreq[y][x] = dctResult[y][x]
+		}
+	}
+
+	// 计算低频分量的平均值
+	var sum float64
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			sum += lowFreq[y][x]
+		}
+	}
+	average := sum / 64
+
+	// 生成哈希值
+	var hashStr string
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			if lowFreq[y][x] > average {
+				hashStr += "1"
+			} else {
+				hashStr += "0"
+			}
+		}
+	}
+
+	return hashStr
+}
+
+// ========================================================================
+
+// case59 差异哈希算法获取图像的指纹字符串
+
+func case59() {
+	src1 := getImg("./output_case4.jpg")
+	// 计算均值哈希值
+	hash1 := DifferenceHash(src1)
+	fmt.Println("图像的差异哈希指纹字符串:", hash1)
+
+	src2 := getImg("./output_case5.jpg")
+	// 计算均值哈希值
+	hash2 := DifferenceHash(src2)
+	fmt.Println("图像的差异哈希指纹字符串:", hash2)
+
+	src3 := getImg("./output_case3.jpg")
+	// 计算均值哈希值
+	hash3 := DifferenceHash(src3)
+	fmt.Println("图像的差异哈希指纹字符串:", hash3)
+
+	src4 := getImg("./output_case7.jpg")
+	// 计算均值哈希值
+	hash4 := DifferenceHash(src4)
+	fmt.Println("图像的差异哈希指纹字符串:", hash4)
+}
+
+// DifferenceHash 计算图像的差异哈希值
+func DifferenceHash(img image.Image) string {
+	// 缩放图像到 9x8
+	resized := image.NewRGBA(image.Rect(0, 0, 9, 8))
+	draw.NearestNeighbor.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Src, nil)
+
+	// 灰度化
+	grayPixels := make([]uint8, 9*8)
+	index := 0
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 9; x++ {
+			r, g, b, _ := resized.At(x, y).RGBA()
+			r = r >> 8
+			g = g >> 8
+			b = b >> 8
+			gray := uint8((r + g + b) / 3)
+			grayPixels[index] = gray
+			index++
+		}
+	}
+
+	// 生成哈希值
+	var hashStr string
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			currentIndex := y*9 + x
+			nextIndex := currentIndex + 1
+			if grayPixels[nextIndex] > grayPixels[currentIndex] {
+				hashStr += "1"
+			} else {
+				hashStr += "0"
+			}
+		}
+	}
+
+	return hashStr
+}
+
+// ========================================================================
+
+// case60 图像的高斯模糊
+// 高斯模糊是一种常见的图像处理技术，用于减少图像中的噪声和细节，使图像变得模糊平滑
+
+func case60() {
+	src := getTest2Img()
+
+	// 生成高斯核
+	kernelSize := 44
+	sigma := 444.0
+	kernel := generateGaussianKernel(kernelSize, sigma)
+
+	// 进行高斯模糊
+	blurred := gaussianBlur(src, kernel)
+
+	outputFileName := "output_case60.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, blurred, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+// 生成高斯核
+func generateGaussianKernel(size int, sigma float64) [][]float64 {
+	kernel := make([][]float64, size)
+	for i := range kernel {
+		kernel[i] = make([]float64, size)
+	}
+	center := size / 2
+	sum := 0.0
+	for x := 0; x < size; x++ {
+		for y := 0; y < size; y++ {
+			dx := float64(x - center)
+			dy := float64(y - center)
+			kernel[x][y] = math.Exp(-(dx*dx+dy*dy)/(2*sigma*sigma)) / (2 * math.Pi * sigma * sigma)
+			sum += kernel[x][y]
+		}
+	}
+	// 归一化
+	for x := 0; x < size; x++ {
+		for y := 0; y < size; y++ {
+			kernel[x][y] /= sum
+		}
+	}
+	return kernel
+}
+
+// 图像高斯模糊
+func gaussianBlur(src image.Image, kernel [][]float64) image.Image {
+	bounds := src.Bounds()
+	dst := image.NewRGBA(bounds)
+	kernelSize := len(kernel)
+	halfKernel := kernelSize / 2
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			var rSum, gSum, bSum, aSum float64
+			for ky := 0; ky < kernelSize; ky++ {
+				for kx := 0; kx < kernelSize; kx++ {
+					nx := x + kx - halfKernel
+					ny := y + ky - halfKernel
+					if nx < bounds.Min.X {
+						nx = bounds.Min.X
+					} else if nx >= bounds.Max.X {
+						nx = bounds.Max.X - 1
+					}
+					if ny < bounds.Min.Y {
+						ny = bounds.Min.Y
+					} else if ny >= bounds.Max.Y {
+						ny = bounds.Max.Y - 1
+					}
+					r, g, b, a := src.At(nx, ny).RGBA()
+					r = r >> 8
+					g = g >> 8
+					b = b >> 8
+					a = a >> 8
+					rSum += float64(r) * kernel[kx][ky]
+					gSum += float64(g) * kernel[kx][ky]
+					bSum += float64(b) * kernel[kx][ky]
+					aSum += float64(a) * kernel[kx][ky]
+				}
+			}
+			dst.Set(x, y, color.RGBA{
+				uint8(rSum),
+				uint8(gSum),
+				uint8(bSum),
+				uint8(aSum),
+			})
+		}
+	}
+	return dst
+}
+
+// ========================================================================
 
 // ========================================================================
 
