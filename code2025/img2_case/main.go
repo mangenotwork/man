@@ -6,9 +6,14 @@ import (
 	"image/color"
 	_ "image/gif" // 使用 _ 导入 image/gif、image/jpeg 和 image/png 包，这会调用这些包的 init 函数，从而注册相应的图像格式
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
+	"io"
 	"log"
 	"os"
+
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
 )
 
 func main() {
@@ -214,4 +219,15 @@ func case1() {
 	_, fileType, err := LoadImage("./test2.jpg")
 	log.Println("err = ", err)
 	log.Println("fileType = ", fileType)
+}
+
+// 如果您有未知格式的图像数据，请使用图像。解码功能可以检测格式。公认的格式集是在运行时构建的，不限于标准包库中的格式。
+// 图像格式包通常在init函数中注册其格式，主包将“下划线导入”此类包，仅用于格式注册的副作用。
+// convertToPNG converts from any recognized format to PNG.
+func convertToPNG(w io.Writer, r io.Reader) error {
+	img, _, err := image.Decode(r)
+	if err != nil {
+		return err
+	}
+	return png.Encode(w, img)
 }
