@@ -26,7 +26,9 @@ func main() {
 	//
 	//fmt.Println(IsLocalPortAvailable(80))
 
-	case3()
+	//case3()
+
+	case4()
 
 }
 
@@ -279,4 +281,28 @@ func getEncoding(charset Charset) encoding.Encoding {
 		return e
 	}
 	return nil
+}
+
+// 分割字符指定前缀后缀
+func extractSection(s string, start, end rune) (prefix, body, suffix string, found bool) {
+	if strings.HasPrefix(s, string(start)) {
+		// no prefix
+		body = s[1:]
+	} else {
+		a := strings.SplitN(s, string(start), 2)
+		if len(a) != 2 {
+			return "", "", s, false
+		}
+		prefix = a[0]
+		body = a[1]
+	}
+	a := strings.SplitN(body, string(end), 2)
+	if len(a) != 2 {
+		return "", "", "", false
+	}
+	return prefix, a[0], a[1], true
+}
+
+func case4() {
+	fmt.Println(extractSection("aa(123)cc", '(', ')'))
 }
