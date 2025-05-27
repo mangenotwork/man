@@ -14,6 +14,7 @@ import (
 	mathRand "math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,9 @@ func main() {
 
 	//case3()
 
-	case4()
+	//case4()
+
+	case8()
 
 }
 
@@ -305,4 +308,132 @@ func extractSection(s string, start, end rune) (prefix, body, suffix string, fou
 
 func case4() {
 	fmt.Println(extractSection("aa(123)cc", '(', ')'))
+}
+
+// CopyMap returns a copy of map[string]string
+func CopyMap[T comparable, R interface{}](items map[T]R) map[T]R {
+	result := make(map[T]R)
+	for idx, item := range items {
+		result[idx] = item
+	}
+	return result
+}
+
+// CopyStringMap returns a copy of map[string]string
+func CopyStringMap(items map[string]string) map[string]string {
+	result := make(map[string]string)
+	for idx, item := range items {
+		result[idx] = item
+	}
+	return result
+}
+
+func case5() {
+	source := map[string]int{"foo": 1, "bar": 2}
+	duplicate := CopyMap(source)
+	fmt.Println(duplicate)
+
+	source2 := map[string]string{"foo": "1", "bar": "2"}
+	duplicate2 := CopyStringMap(source2)
+	fmt.Println(duplicate2)
+}
+
+// 给切片的每个元素应用一个函数
+func CollectionApply[T any, R interface{}](collection []T, mutator func(t T) R) []R {
+	cast := make([]R, len(collection))
+	for i, v := range collection {
+		cast[i] = mutator(v)
+	}
+	return cast
+}
+
+func case6() {
+	fmt.Println(CollectionApply([]int{1, 2, 3}, func(i int) int {
+		return i * 2
+	}))
+}
+
+var LocalhostStrings = [4]string{"localhost", "[::1]", "::1", "127.0.0.1"}
+
+func isLocalhost(host string) bool {
+	normalizedHost := strings.ToLower(host)
+	for _, localhostString := range LocalhostStrings {
+		if strings.HasPrefix(normalizedHost, localhostString) {
+			return isValidRemainder(strings.TrimPrefix(normalizedHost, localhostString))
+		}
+	}
+
+	return false
+}
+
+func isValidRemainder(remainder string) bool {
+	return remainder == "" || strings.HasPrefix(remainder, ":")
+}
+
+// 判断是否是本地地址
+func case7() {
+	fmt.Println(isLocalhost("localhost"))
+	fmt.Println(isLocalhost("127.0.0.1"))
+	fmt.Println(isLocalhost("127.0.0.1:8080"))
+	fmt.Println(isLocalhost("127.0.0.1:8080/"))
+}
+
+func loadFields(value string) (map[string]string, error) {
+	result := make(map[string]string)
+	if len(value) == 0 {
+		return result, nil
+	}
+	urlParse := strings.Split(value, "?")
+	if len(urlParse) < 2 {
+		return result, nil
+	}
+	parts := strings.Split(urlParse[1], "&")
+	for _, part := range parts {
+		keyValue := strings.Split(part, "=")
+		if len(keyValue) == 2 {
+			key, err := sanitizeKey(keyValue[0])
+			if err != nil {
+				return nil, err
+			}
+			if result[key] == "" {
+				result[key] = keyValue[1]
+			} else {
+				result[key] += "," + keyValue[1]
+			}
+		}
+	}
+	return result, nil
+}
+
+func sanitizeKey(key string) (string, error) {
+	if key == "" {
+		return "", nil
+	}
+	res, err := url.QueryUnescape(key)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(res, " "), nil
+}
+
+// 提取url中的参数
+func case8() {
+	rawURL := "https://www.baidu.com/s?wd=aaa&ie=utf-8,1&tn=15007414_9_dg"
+	values, err := loadFields(rawURL)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for k, v := range values {
+		fmt.Println(k, v)
+	}
+
+	// 标准库实现
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for k, v := range u.Query() {
+		fmt.Println(k, v)
+	}
+
 }
