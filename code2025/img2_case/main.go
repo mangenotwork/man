@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	_ "image/gif" // 使用 _ 导入 image/gif、image/jpeg 和 image/png 包，这会调用这些包的 init 函数，从而注册相应的图像格式
@@ -10,6 +11,7 @@ import (
 	_ "image/png"
 	"io"
 	"log"
+	"math"
 	"os"
 
 	_ "golang.org/x/image/bmp"
@@ -230,4 +232,165 @@ func convertToPNG(w io.Writer, r io.Reader) error {
 		return err
 	}
 	return png.Encode(w, img)
+}
+
+//	=========================================================================================================  颜色融合
+//
+// Color 表示一个RGBA颜色
+type Color struct {
+	R, G, B, A float64 // 范围从0.0到1.0
+}
+
+// NewColor 创建一个新的RGBA颜色
+func NewColor(r, g, b, a float64) Color {
+	return Color{
+		R: clamp(r, 0.0, 1.0),
+		G: clamp(g, 0.0, 1.0),
+		B: clamp(b, 0.0, 1.0),
+		A: clamp(a, 0.0, 1.0),
+	}
+}
+
+// 辅助函数：将值限制在min和max之间
+func clamp(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+// Add 颜色加法混合
+func (c Color) Add(other Color) Color {
+	return Color{
+		R: clamp(c.R+other.R, 0.0, 1.0),
+		G: clamp(c.G+other.G, 0.0, 1.0),
+		B: clamp(c.B+other.B, 0.0, 1.0),
+		A: clamp(c.A+other.A, 0.0, 1.0),
+	}
+}
+
+// Subtract 颜色减法混合
+func (c Color) Subtract(other Color) Color {
+	return Color{
+		R: clamp(c.R-other.R, 0.0, 1.0),
+		G: clamp(c.G-other.G, 0.0, 1.0),
+		B: clamp(c.B-other.B, 0.0, 1.0),
+		A: clamp(c.A-other.A, 0.0, 1.0),
+	}
+}
+
+// Multiply 颜色乘法混合（常用于变暗）
+func (c Color) Multiply(other Color) Color {
+	return Color{
+		R: clamp(c.R*other.R, 0.0, 1.0),
+		G: clamp(c.G*other.G, 0.0, 1.0),
+		B: clamp(c.B*other.B, 0.0, 1.0),
+		A: clamp(c.A*other.A, 0.0, 1.0),
+	}
+}
+
+// Blend 颜色混合，根据比例混合两种颜色
+func (c Color) Blend(other Color, ratio float64) Color {
+	ratio = clamp(ratio, 0.0, 1.0)
+	invRatio := 1.0 - ratio
+	return Color{
+		R: c.R*invRatio + other.R*ratio,
+		G: c.G*invRatio + other.G*ratio,
+		B: c.B*invRatio + other.B*ratio,
+		A: c.A*invRatio + other.A*ratio,
+	}
+}
+
+// String 返回颜色的字符串表示形式（用于调试）
+func (c Color) String() string {
+	return fmt.Sprintf("RGBA(%d, %d, %d, %.2f)",
+		int(c.R*255), int(c.G*255), int(c.B*255), c.A)
+}
+
+// ToHex 返回颜色的十六进制表示形式
+func (c Color) ToHex() string {
+	return fmt.Sprintf("#%02X%02X%02X",
+		int(c.R*255), int(c.G*255), int(c.B*255))
+}
+
+// 从HSV颜色空间转换到RGB
+func HSVtoRGB(h, s, v float64) Color {
+	h = math.Mod(h, 360.0)
+	if h < 0 {
+		h += 360.0
+	}
+	s = clamp(s, 0.0, 1.0)
+	v = clamp(v, 0.0, 1.0)
+
+	if s == 0 {
+		return NewColor(v, v, v, 1.0)
+	}
+
+	h /= 60.0
+	hi := int(h) % 6
+	f := h - float64(int(h))
+	p := v * (1.0 - s)
+	q := v * (1.0 - s*f)
+	t := v * (1.0 - s*(1.0-f))
+
+	var r, g, b float64
+	switch hi {
+	case 0:
+		r, g, b = v, t, p
+	case 1:
+		r, g, b = q, v, p
+	case 2:
+		r, g, b = p, v, t
+	case 3:
+		r, g, b = p, q, v
+	case 4:
+		r, g, b = t, p, v
+	case 5:
+		r, g, b = v, p, q
+	}
+
+	return NewColor(r, g, b, 1.0)
+}
+
+func case2() {
+	// 定义几个基本颜色变量
+	red := NewColor(1.0, 0.0, 0.0, 1.0)
+	green := NewColor(0.0, 1.0, 0.0, 1.0)
+	blue := NewColor(0.0, 0.0, 1.0, 1.0)
+	yellow := NewColor(1.0, 1.0, 0.0, 1.0)
+
+	// 创建一个从HSV转换的颜色
+	purple := HSVtoRGB(270, 0.8, 0.8)
+
+	// 演示颜色混合
+	fmt.Println("基本颜色:")
+	fmt.Println("红色:", red.ToHex())
+	fmt.Println("绿色:", green.ToHex())
+	fmt.Println("蓝色:", blue.ToHex())
+	fmt.Println("黄色:", yellow.ToHex())
+	fmt.Println("紫色:", purple.ToHex())
+
+	fmt.Println("\n颜色混合示例:")
+	// 混合红色和绿色
+	yellowMix := red.Blend(green, 0.5)
+	fmt.Println("红色 + 绿色 =", yellowMix.ToHex(), yellowMix)
+
+	// 混合蓝色和黄色
+	greenMix := blue.Blend(yellow, 0.5)
+	fmt.Println("蓝色 + 黄色 =", greenMix.ToHex(), greenMix)
+
+	// 混合所有基本颜色
+	mixed := red.Blend(green, 0.25).Blend(blue, 0.25).Blend(yellow, 0.25)
+	fmt.Println("所有颜色混合 =", mixed.ToHex(), mixed)
+
+	// 颜色减法
+	darker := red.Subtract(NewColor(0.3, 0.0, 0.0, 1.0))
+	fmt.Println("红色变暗 =", darker.ToHex(), darker)
+
+	// 颜色乘法
+	darker2 := red.Multiply(NewColor(0.7, 0.7, 0.7, 1.0))
+	fmt.Println("红色乘暗 =", darker2.ToHex(), darker2)
 }
