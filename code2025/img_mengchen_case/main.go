@@ -38,7 +38,7 @@ func main() {
 	frostedArea := image.Rect(520, 200, 1040, 380) // x1,y1,x2,y2
 
 	// 5. 应用毛玻璃效果
-	FrostedGlassEffect(rgba, frostedArea, 8) // 效果强度=8
+	FrostedGlassEffect(rgba, frostedArea, 15) // 效果强度=8
 
 	// 4. 定义毛玻璃效果区域
 	frostedArea = image.Rect(600, 50, 800, 140) // x1,y1,x2,y2
