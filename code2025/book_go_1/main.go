@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"runtime/pprof"
 )
 
 // golang学习 《Head First Go语言程序设计》
@@ -14,7 +16,9 @@ func main() {
 
 	//case3()
 
-	case4()
+	//case4()
+
+	case5()
 }
 
 // 指针
@@ -122,3 +126,43 @@ func case4() {
 }
 
 // 将程序中的数据隐藏在一部分代码中而对另一部分不可见的方法称为封装
+
+// case5  手动生成 profile 文件（适合短期程序）
+// 对于一些短期运行的程序（如脚本、定时任务），没办法通过 HTTP 接口动态采集数据，这时可以手动生成 profile 文件。
+func case5() {
+
+	heavyTask := func() {
+		// 模拟CPU密集型任务
+		sum := 0
+		for i := 0; i < 1e8; i++ {
+			sum += i
+		}
+	}
+
+	// 生成CPU profile文件
+	cpuFile, _ := os.Create("cpu.pprof")
+
+	defer cpuFile.Close()
+
+	_ = pprof.StartCPUProfile(cpuFile) // 开始CPU采样
+
+	defer pprof.StopCPUProfile() // 程序结束时停止采样
+
+	// 生成堆内存profile文件
+
+	heapFile, _ := os.Create("heap.pprof")
+
+	defer heapFile.Close()
+
+	defer pprof.WriteHeapProfile(heapFile) // 程序结束前写入堆内存数据
+
+	// 你的业务逻辑，比如一段耗时的计算
+	heavyTask()
+
+}
+
+//  go tool pprof 工具使用
+//  安装 Graphviz 并配置环境变量
+// go tool pprof cpu.pprof
+// web
+// 火焰图go-torch   需要安装 FlameGraph 还有perl
