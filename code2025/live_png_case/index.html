@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEIC格式图片上传</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .upload-box {
+                @apply border-2 border-dashed border-blue-500 rounded-lg p-8 text-center transition-all duration-300;
+            }
+            .upload-box-active {
+                @apply border-green-500 bg-blue-50;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6 md:p-8">
+    <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">HEIC格式图片上传</h1>
+    <p class="text-gray-600 mb-6">在苹果设备上获取原始HEIC格式图片（请使用Safari浏览器）</p>
+
+    <!-- 提示信息 -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fa fa-info-circle text-blue-500 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                    请确保在iOS设置中开启"保留原始照片"选项。上传时请选择"照片"应用中的图片，而非经过压缩的版本。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传区域 -->
+    <div id="uploadArea" class="upload-box mb-6">
+        <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
+        <label for="fileInput" class="cursor-pointer">
+            <div class="flex flex-col items-center justify-center">
+                <i class="fa fa-cloud-upload text-5xl text-blue-500 mb-4"></i>
+                <p class="text-gray-700 mb-2">点击或拖拽图片到此处</p>
+                <p class="text-sm text-gray-500">支持HEIC、JPEG等格式</p>
+            </div>
+        </label>
+    </div>
+
+    <!-- 格式检测结果 -->
+    <div id="resultArea" class="hidden mb-6">
+        <h2 class="text-xl font-semibold mb-4">文件信息</h2>
+        <div id="fileInfo" class="space-y-4"></div>
+    </div>
+
+    <!-- 上传按钮 -->
+    <div id="uploadButtonContainer" class="hidden text-center">
+        <button id="uploadBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-300">
+            <i class="fa fa-upload mr-2"></i>上传文件
+        </button>
+    </div>
+
+    <!-- 进度条 -->
+    <div id="progressContainer" class="hidden mb-6">
+        <div class="flex justify-between text-sm mb-1">
+            <span id="progressFileName">正在上传...</span>
+            <span id="progressPercent">0%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2.5">
+            <div id="progressBar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- 状态消息 -->
+    <div id="message" class="hidden p-4 rounded-lg mb-6"></div>
+</div>
+
+<script>
+    // DOM元素
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const resultArea = document.getElementById('resultArea');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadButtonContainer = document.getElementById('uploadButtonContainer');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressFileName = document.getElementById('progressFileName');
+    const progressPercent = document.getElementById('progressPercent');
+    const message = document.getElementById('message');
+
+    // 存储选中的文件
+    let selectedFiles = [];
+
+    // 拖放事件处理
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('upload-box-active');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('upload-box-active');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('upload-box-active');
+
+        if (e.dataTransfer.files.length) {
+            handleFiles(e.dataTransfer.files);
+        }
+    });
+
+    // 文件选择事件
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    // 上传按钮点击事件
+    uploadBtn.addEventListener('click', uploadFiles);
+
+    // 处理选择的文件
+    function handleFiles(files) {
+        if (!files.length) return;
+
+        selectedFiles = Array.from(files);
+        displayFileInfo();
+
+        resultArea.classList.remove('hidden');
+        uploadButtonContainer.classList.remove('hidden');
+    }
+
+    // 显示文件信息
+    function displayFileInfo() {
+        fileInfo.innerHTML = '';
+
+        selectedFiles.forEach((file, index) => {
+            // 检测文件类型
+            const isHeic = file.type === 'image/heic' ||
+                file.name.toLowerCase().endsWith('.heic') ||
+                file.name.toLowerCase().endsWith('.heif');
+
+            // 创建文件信息元素
+            const fileElement = document.createElement('div');
+            fileElement.className = `p-3 border rounded-lg ${isHeic ? 'border-green-500 bg-green-50' : 'border-gray-200'}`;
+
+            // 尝试获取文件的MIME类型
+            let fileType = file.type || '未知类型';
+
+            fileElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-medium ${isHeic ? 'text-green-700' : 'text-gray-800'}">${file.name}</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                类型: ${fileType} ${isHeic ? '<span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded ml-2">HEIC格式</span>' : ''}
+                            </p>
+                            <p class="text-sm text-gray-600">
+                                大小: ${formatFileSize(file.size)}
+                            </p>
+                        </div>
+                        <button class="text-red-500 hover:text-red-700" onclick="removeFile(${index})">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                `;
+
+            fileInfo.appendChild(fileElement);
+        });
+    }
+
+    // 移除文件
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+
+        if (selectedFiles.length === 0) {
+            resultArea.classList.add('hidden');
+            uploadButtonContainer.classList.add('hidden');
+        } else {
+            displayFileInfo();
+        }
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 上传文件
+    function uploadFiles() {
+        if (selectedFiles.length === 0) return;
+
+        const formData = new FormData();
+
+        // 添加所有文件
+        selectedFiles.forEach(file => {
+            formData.append('files', file);
+            // 添加文件原始名称，用于后端识别
+            formData.append(`originalName_${file.name}`, file.name);
+        });
+
+        // 显示进度条
+        progressContainer.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressPercent.textContent = '0%';
+
+        // 创建并配置请求
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+
+        // 上传进度处理
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percent + '%';
+                progressPercent.textContent = percent + '%';
+            }
+        });
+
+        // 上传完成处理
+        xhr.addEventListener('load', () => {
+            progressContainer.classList.add('hidden');
+
+            if (xhr.status === 200) {
+                showMessage('上传成功！', 'success');
+                // 清空选择
+                selectedFiles = [];
+                resultArea.classList.add('hidden');
+                uploadButtonContainer.classList.add('hidden');
+                fileInput.value = '';
+            } else {
+                showMessage('上传失败: ' + xhr.responseText, 'error');
+            }
+        });
+
+        // 上传错误处理
+        xhr.addEventListener('error', () => {
+            progressContainer.classList.add('hidden');
+            showMessage('上传过程中发生错误', 'error');
+        });
+
+        // 发送请求
+        xhr.send(formData);
+    }
+
+    // 显示消息提示
+    function showMessage(text, type) {
+        message.textContent = text;
+        message.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+
+        if (type === 'success') {
+            message.classList.add('bg-green-100', 'text-green-800');
+        } else {
+            message.classList.add('bg-red-100', 'text-red-800');
+        }
+
+        // 3秒后隐藏消息
+        setTimeout(() => {
+            message.classList.add('hidden');
+        }, 3000);
+    }
+</script>
+</body>
+</html>
