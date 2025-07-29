@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	_ "image/gif" // 使用 _ 导入 image/gif、image/jpeg 和 image/png 包，这会调用这些包的 init 函数，从而注册相应的图像格式
+	"image/jpeg"
 	_ "image/jpeg"
 	"image/png"
 	_ "image/png"
@@ -13,6 +14,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
@@ -22,6 +24,23 @@ func main() {
 
 	// case1()
 
+	// case2()
+
+	// case3()
+
+	// case4()
+
+	// case5()
+
+	// case6()
+
+	// case7()
+
+	// case8()
+
+	// case9()
+
+	case10()
 }
 
 func ToBase64(b []byte) string {
@@ -393,4 +412,1053 @@ func case2() {
 	// 颜色乘法
 	darker2 := red.Multiply(NewColor(0.7, 0.7, 0.7, 1.0))
 	fmt.Println("红色乘暗 =", darker2.ToHex(), darker2)
+}
+
+//	=========================================================================================================  计算图片的饱和度
+
+// 计算单个RGB像素的饱和度
+// 返回值范围: 0.0 (灰度) 到 1.0 (最大饱和度)
+func calculatePixelSaturation(r, g, b uint8) float64 {
+	// 将uint8转换为0.0-1.0范围的浮点数
+	rNorm := float64(r) / 255.0
+	gNorm := float64(g) / 255.0
+	bNorm := float64(b) / 255.0
+
+	// 找到RGB中的最大值和最小值
+	maxVal := max3(rNorm, gNorm, bNorm)
+	minVal := min3(rNorm, gNorm, bNorm)
+
+	// 如果是灰度（max == min），饱和度为0
+	if maxVal == minVal {
+		return 0.0
+	}
+
+	// 计算亮度
+	luminance := (maxVal + minVal) / 2.0
+
+	var saturation float64
+	if luminance <= 0.5 {
+		saturation = (maxVal - minVal) / (maxVal + minVal)
+	} else {
+		saturation = (maxVal - minVal) / (2.0 - maxVal - minVal)
+	}
+
+	return saturation
+}
+
+// 辅助函数：返回三个数中的最大值
+func max3(a, b, c float64) float64 {
+	max := a
+	if b > max {
+		max = b
+	}
+	if c > max {
+		max = c
+	}
+	return max
+}
+
+// 辅助函数：返回三个数中的最小值
+func min3(a, b, c float64) float64 {
+	min := a
+	if b < min {
+		min = b
+	}
+	if c < min {
+		min = c
+	}
+	return min
+}
+
+// 计算图片的平均饱和度
+func calculateImageSaturation(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0, fmt.Errorf("图片尺寸为零")
+	}
+
+	// 计算所有像素的饱和度并取平均值
+	var totalSaturation float64
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 计算当前像素的饱和度并累加
+			totalSaturation += calculatePixelSaturation(r8, g8, b8)
+		}
+	}
+
+	// 返回平均饱和度
+	averageSaturation := totalSaturation / float64(totalPixels)
+	return averageSaturation, nil
+}
+
+func case3() {
+	filePath := "./output_case3.jpg"
+	saturation, err := calculateImageSaturation(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 以百分比形式显示结果
+	fmt.Printf("图片的平均饱和度: %.2f%%\n", saturation*100)
+}
+
+//	=========================================================================================================  计算图片的亮度值
+// ITU-R BT.709 标准的亮度计算公式：
+// Y = 0.2126*R + 0.7152*G + 0.0722*B
+// 这个公式考虑了人眼对不同颜色的敏感度差异：
+// 绿色对亮度感知贡献最大（71.52%）
+// 红色次之（21.26%）
+// 蓝色贡献最小（7.22%）
+
+// 计算单个RGB像素的亮度
+// 返回值范围: 0.0 (最暗) 到 1.0 (最亮)
+func calculatePixelBrightness(r, g, b uint8) float64 {
+	// 使用ITU-R BT.709标准的亮度计算公式
+	// 人眼对绿色最敏感，红色次之，蓝色最不敏感
+	rNorm := float64(r) / 255.0
+	gNorm := float64(g) / 255.0
+	bNorm := float64(b) / 255.0
+
+	// 亮度公式：Y = 0.2126*R + 0.7152*G + 0.0722*B
+	brightness := 0.2126*rNorm + 0.7152*gNorm + 0.0722*bNorm
+	return brightness
+}
+
+// 计算图片的平均亮度
+func calculateImageBrightness(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0, fmt.Errorf("图片尺寸为零")
+	}
+
+	// 计算所有像素的亮度并取平均值
+	var totalBrightness float64
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 计算当前像素的亮度并累加
+			totalBrightness += calculatePixelBrightness(r8, g8, b8)
+		}
+	}
+
+	// 返回平均亮度
+	averageBrightness := totalBrightness / float64(totalPixels)
+	return averageBrightness, nil
+}
+
+func case4() {
+	filePath := "./output_case3.jpg"
+	brightness, err := calculateImageBrightness(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 以百分比形式显示结果
+	fmt.Printf("图片的平均亮度: %.2f%%\n", brightness*100)
+}
+
+//	=========================================================================================================  计算图片的对比度值
+// 两种计算对比度的方法：
+//
+//1. Michelson 对比度（默认使用）：
+//	公式：(最大亮度 - 最小亮度) / (最大亮度 + 最小亮度)
+//	这种方法简单直观，通过计算图像中最亮和最暗像素的差异来衡量对比度
+//	值范围：0.0（无对比度，完全灰阶）到 1.0（最大对比度）
+//2. 标准差对比度（注释中提供）：
+//	基于亮度值的统计分布，使用标准差除以平均值（变异系数）
+//	这种方法能更好地反映整体图像的对比度分布情况
+//	适用于需要更精确对比度评估的场景
+
+// 计算单个RGB像素的亮度（使用ITU-R BT.709标准）
+func getLuminance(r, g, b uint8) float64 {
+	rNorm := float64(r) / 255.0
+	gNorm := float64(g) / 255.0
+	bNorm := float64(b) / 255.0
+	return 0.2126*rNorm + 0.7152*gNorm + 0.0722*bNorm
+}
+
+// 计算图片的对比度
+// 对比度公式: (最大亮度 - 最小亮度) / (最大亮度 + 最小亮度)
+// 返回值范围: 0.0 (无对比度) 到 1.0 (最大对比度)
+func calculateImageContrast(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0, fmt.Errorf("图片尺寸为零")
+	}
+
+	// 初始化最大和最小亮度
+	maxLuminance := 0.0
+	minLuminance := 1.0
+	var totalLuminance float64
+	var totalLuminanceSquared float64
+
+	// 遍历所有像素计算亮度统计值
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 计算当前像素的亮度
+			luminance := getLuminance(r8, g8, b8)
+
+			// 更新最大和最小亮度
+			if luminance > maxLuminance {
+				maxLuminance = luminance
+			}
+			if luminance < minLuminance {
+				minLuminance = luminance
+			}
+
+			// 累加亮度值用于计算标准差
+			totalLuminance += luminance
+			totalLuminanceSquared += luminance * luminance
+		}
+	}
+
+	//// 方法1: 使用最大最小亮度计算对比度 (Michelson对比度)
+	//// 这种方法适合简单场景
+	//contrast := (maxLuminance - minLuminance) / (maxLuminance + minLuminance)
+
+	// 方法2: 使用标准差计算对比度 (更精确但计算稍复杂)
+	mean := totalLuminance / float64(totalPixels)
+	variance := (totalLuminanceSquared / float64(totalPixels)) - (mean * mean)
+	stdDev := math.Sqrt(variance)
+	contrast := stdDev / mean // 变异系数作为对比度度量
+
+	return contrast, nil
+}
+
+func case5() {
+	filePath := "./output_case3.jpg"
+	contrast, err := calculateImageContrast(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 以百分比形式显示结果
+	fmt.Printf("图片的对比度: %.2f%%\n", contrast*100)
+}
+
+//	=========================================================================================================  计算图片的锐度值
+// 使用 Sobel 算子来计算图像的锐度，工作原理如下：
+//	首先将图像转换为亮度矩阵，忽略色彩信息，只关注明暗变化
+//	使用 Sobel 边缘检测算子，该算子包含两个卷积核：
+//	水平方向卷积核（检测垂直边缘）
+//	垂直方向卷积核（检测水平边缘）
+//	对每个像素应用这两个卷积核，计算梯度幅度（边缘强度）
+//	所有像素的平均边缘强度作为图像的锐度值
+
+// 计算单个像素的亮度
+//func getLuminance(r, g, b uint8) float64 {
+//	rNorm := float64(r) / 255.0
+//	gNorm := float64(g) / 255.0
+//	bNorm := float64(b) / 255.0
+//	return 0.2126*rNorm + 0.7152*gNorm + 0.0722*bNorm
+//}
+
+// 使用Sobel算子计算锐度
+// 锐度值越高，表示图像越清晰
+func calculateImageSharpness(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	if width < 3 || height < 3 {
+		return 0.0, fmt.Errorf("图片尺寸过小，无法计算锐度")
+	}
+
+	// 创建亮度矩阵
+	luminance := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		luminance[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			luminance[y][x] = getLuminance(r8, g8, b8)
+		}
+	}
+
+	// Sobel算子 - 水平和垂直方向的卷积核
+	sobelX := [3][3]float64{
+		{-1, 0, 1},
+		{-2, 0, 2},
+		{-1, 0, 1},
+	}
+
+	sobelY := [3][3]float64{
+		{-1, -2, -1},
+		{0, 0, 0},
+		{1, 2, 1},
+	}
+
+	// 计算边缘强度
+	var totalEdgeStrength float64
+	edgeCount := 0
+
+	// 遍历每个像素（跳过边界像素）
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			// 应用Sobel算子
+			var gx, gy float64
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					gx += luminance[y+ky][x+kx] * sobelX[ky+1][kx+1]
+					gy += luminance[y+ky][x+kx] * sobelY[ky+1][kx+1]
+				}
+			}
+
+			// 计算梯度幅度（边缘强度）
+			edgeStrength := math.Sqrt(gx*gx + gy*gy)
+			totalEdgeStrength += edgeStrength
+			edgeCount++
+		}
+	}
+
+	// 计算平均边缘强度作为锐度度量
+	averageSharpness := totalEdgeStrength / float64(edgeCount)
+	return averageSharpness, nil
+}
+
+func case6() {
+	filePath := "./output_case3.jpg"
+	sharpness, err := calculateImageSharpness(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 锐度值没有固定范围，相对值越高表示图像越清晰
+	fmt.Printf("图片的锐度值: %.4f\n", sharpness)
+}
+
+//	=========================================================================================================  计算图片的曝光度值
+//
+// 曝光度分析结果
+type ExposureResult struct {
+	OverexposedRatio  float64 // 过曝像素比例 (0.0-1.0)
+	UnderexposedRatio float64 // 欠曝像素比例 (0.0-1.0)
+	AverageLuminance  float64 // 平均亮度 (0.0-1.0)
+	ExposureRating    string  // 曝光评级: "过曝", "欠曝", "正常"
+}
+
+// 计算图片的曝光度
+func calculateImageExposure(filePath string) (ExposureResult, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return ExposureResult{}, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return ExposureResult{}, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return ExposureResult{}, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return ExposureResult{}, fmt.Errorf("图片尺寸为零")
+	}
+
+	// 阈值定义
+	overexposureThreshold := 0.9  // 亮度超过此值视为过曝
+	underexposureThreshold := 0.1 // 亮度低于此值视为欠曝
+
+	// 统计变量
+	var overexposedCount, underexposedCount int
+	var totalLuminance float64
+
+	// 遍历所有像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 计算亮度
+			luminance := getLuminance(r8, g8, b8)
+			totalLuminance += luminance
+
+			// 判断是否过曝或欠曝
+			if luminance >= overexposureThreshold {
+				overexposedCount++
+			} else if luminance <= underexposureThreshold {
+				underexposedCount++
+			}
+		}
+	}
+
+	// 计算比例
+	overexposedRatio := float64(overexposedCount) / float64(totalPixels)
+	underexposedRatio := float64(underexposedCount) / float64(totalPixels)
+	averageLuminance := totalLuminance / float64(totalPixels)
+
+	// 确定曝光评级
+	var exposureRating string
+	if overexposedRatio > 0.2 { // 超过20%像素过曝
+		exposureRating = "过曝"
+	} else if underexposedRatio > 0.4 { // 超过40%像素欠曝
+		exposureRating = "欠曝"
+	} else {
+		exposureRating = "正常"
+	}
+
+	return ExposureResult{
+		OverexposedRatio:  overexposedRatio,
+		UnderexposedRatio: underexposedRatio,
+		AverageLuminance:  averageLuminance,
+		ExposureRating:    exposureRating,
+	}, nil
+}
+
+func case7() {
+	filePath := "./output_case3.jpg"
+	result, err := calculateImageExposure(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 输出结果
+	fmt.Printf("图片曝光度分析:\n")
+	fmt.Printf("  过曝像素比例: %.2f%%\n", result.OverexposedRatio*100)
+	fmt.Printf("  欠曝像素比例: %.2f%%\n", result.UnderexposedRatio*100)
+	fmt.Printf("  平均亮度: %.2f%%\n", result.AverageLuminance*100)
+	fmt.Printf("  曝光评级: %s\n", result.ExposureRating)
+}
+
+//	=========================================================================================================  计算图片的色温值
+// 这个程序计算色温的原理如下：
+//	分析图像中所有非暗部像素的 RGB 值，忽略过暗像素（避免黑色影响判断）
+//	计算红、绿、蓝三通道的平均值，并以绿色为基准进行归一化处理
+//	通过红蓝光比例计算色温值，使用经验模型将比例转换为开尔文温度
+//	根据色温值判断图片的色调偏向：
+//	低于 5000K：暖色调（偏黄 / 红色）
+//	5000K-7000K：中性色调
+//	高于 7000K：冷色调（偏蓝色）
+
+// 计算图片的色温（开尔文）
+func calculateImageColorTemperature(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0, fmt.Errorf("图片尺寸为零")
+	}
+
+	// 统计所有像素的RGB值总和（忽略极暗像素，避免影响计算）
+	var totalR, totalG, totalB float64
+	validPixels := 0
+	var darkThreshold uint8 = 30 // 忽略暗部像素（避免黑色影响色温判断）
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 忽略暗部像素
+			if r8 < darkThreshold && g8 < darkThreshold && b8 < darkThreshold {
+				continue
+			}
+
+			totalR += float64(r8)
+			totalG += float64(g8)
+			totalB += float64(b8)
+			validPixels++
+		}
+	}
+
+	if validPixels == 0 {
+		return 0.0, fmt.Errorf("图片过暗，无法计算色温")
+	}
+
+	// 计算平均RGB值
+	avgR := totalR / float64(validPixels)
+	avgG := totalG / float64(validPixels)
+	avgB := totalB / float64(validPixels)
+
+	// 归一化处理（以绿色为基准）
+	rNorm := avgR / avgG
+	bNorm := avgB / avgG
+
+	// 计算红蓝光比例
+	rRatio := rNorm / (rNorm + bNorm)
+	bRatio := bNorm / (rNorm + bNorm)
+
+	// 色温转换公式（基于经验模型）
+	// 色温范围大致在2000K（暖黄）到10000K（冷蓝）之间
+	var temperature float64
+	if rRatio > bRatio {
+		// 暖色调
+		ratio := rRatio / bRatio
+		temperature = 6500 - 4500*math.Min(1.0, (ratio-1.0)/2.0)
+	} else {
+		// 冷色调
+		ratio := bRatio / rRatio
+		temperature = 6500 + 3500*math.Min(1.0, (ratio-1.0)/2.0)
+	}
+
+	// 确保色温在合理范围内
+	if temperature < 2000 {
+		temperature = 2000
+	} else if temperature > 10000 {
+		temperature = 10000
+	}
+
+	return temperature, nil
+}
+
+func case8() {
+	filePath := "./output_case3.jpg"
+	temp, err := calculateImageColorTemperature(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 判断色温偏向
+	var tone string
+	if temp < 5000 {
+		tone = "暖色调（偏黄/红）"
+	} else if temp > 7000 {
+		tone = "冷色调（偏蓝）"
+	} else {
+		tone = "中性色调"
+	}
+
+	fmt.Printf("图片的色温: %.0fK\n", temp)
+	fmt.Printf("色调偏向: %s\n", tone)
+}
+
+//	=========================================================================================================  计算图片的色调值
+// 计算图片的色调（Hue）需要将 RGB 颜色空间转换到 HSV（色相 - 饱和度 - 明度）颜色空间，
+//其中 Hue（色相）代表了颜色的基本属性，如红色、绿色、蓝色等。色调通常用角度（0°-360°）表示不同的颜色
+//
+// 原理如下：
+//	将每个像素的 RGB 值转换为 HSV 颜色空间，提取色调（Hue）值
+//	色调用 0°-360° 的角度表示，不同角度对应不同颜色：
+//	0°/360°：红色
+//	60°：黄色
+//	120°：绿色
+//	180°：青色
+//	240°：蓝色
+//	300°：品红色
+//	忽略过暗和低饱和度的像素（接近灰色的像素），避免影响色调判断
+//	统计所有有效像素的色调分布，计算平均色调角度和主要色调类别
+//
+//	程序将色调分为 13 种常见类别，包括红色、橙色、黄色、绿色等，最终输出：
+//	平均色调角度（0°-360°）
+//	主要色调类别（图片中最占优势的颜色）
+
+// 色调范围定义
+type HueRange struct {
+	Start    float64
+	End      float64
+	Category string
+}
+
+// 常见色调范围分类
+var hueRanges = []HueRange{
+	{345, 360, "红色"},
+	{0, 15, "红色"},
+	{15, 45, "橙色"},
+	{45, 75, "黄色"},
+	{75, 105, "绿色"},
+	{105, 135, "青色"},
+	{135, 165, "蓝色"},
+	{165, 195, "靛蓝色"},
+	{195, 225, "紫色"},
+	{225, 255, "粉红色"},
+	{255, 285, "品红色"},
+	{285, 315, "紫红色"},
+	{315, 345, "深红色"},
+}
+
+// 将RGB转换为HSV颜色空间，返回色调值（0-360）
+func rgbToHue(r, g, b uint8) float64 {
+	// 归一化到0.0-1.0范围
+	rNorm := float64(r) / 255.0
+	gNorm := float64(g) / 255.0
+	bNorm := float64(b) / 255.0
+
+	maxVal := math.Max(rNorm, math.Max(gNorm, bNorm))
+	minVal := math.Min(rNorm, math.Min(gNorm, bNorm))
+	delta := maxVal - minVal
+
+	var hue float64
+
+	// 如果delta为0，说明是灰色，没有色调
+	if delta == 0 {
+		return -1 // 用-1表示无色调（灰色）
+	}
+
+	// 计算色调
+	switch {
+	case maxVal == rNorm:
+		hue = math.Mod((gNorm-bNorm)/delta, 6)
+	case maxVal == gNorm:
+		hue = (bNorm-rNorm)/delta + 2
+	case maxVal == bNorm:
+		hue = (rNorm-gNorm)/delta + 4
+	}
+
+	// 转换为0-360度
+	hue *= 60
+	if hue < 0 {
+		hue += 360
+	}
+
+	return hue
+}
+
+// 确定色调所属类别
+func getHueCategory(hue float64) string {
+	if hue < 0 {
+		return "灰色/无色调"
+	}
+
+	for _, r := range hueRanges {
+		if (hue >= r.Start && hue <= r.End) ||
+			(r.Start > r.End && (hue >= r.Start || hue <= r.End)) {
+			return r.Category
+		}
+	}
+	return "未知"
+}
+
+// 计算图片的主色调
+func calculateImageHue(filePath string) (float64, string, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, "", fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, "", fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, "", fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0, "", fmt.Errorf("图片尺寸为零")
+	}
+
+	// 统计变量
+	var totalHue float64
+	hueCount := 0
+	hueDistribution := make(map[string]int)
+	nonGrayPixels := 0
+
+	// 忽略过暗像素的阈值
+	var darkThreshold uint8 = 30
+	// 忽略低饱和度像素的阈值
+	minSaturation := 0.15
+
+	// 遍历所有像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位RGBA值转换为8位RGB值
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 忽略过暗像素
+			if r8 < darkThreshold && g8 < darkThreshold && b8 < darkThreshold {
+				continue
+			}
+
+			// 计算饱和度（用于过滤低饱和度像素）
+			rNorm := float64(r8) / 255.0
+			gNorm := float64(g8) / 255.0
+			bNorm := float64(b8) / 255.0
+			maxVal := math.Max(rNorm, math.Max(gNorm, bNorm))
+			minVal := math.Min(rNorm, math.Min(gNorm, bNorm))
+			var saturation float64
+			if maxVal > 0 {
+				saturation = (maxVal - minVal) / maxVal
+			}
+
+			// 忽略低饱和度像素（接近灰色）
+			if saturation < minSaturation {
+				continue
+			}
+
+			// 计算色调
+			hue := rgbToHue(r8, g8, b8)
+			if hue >= 0 {
+				totalHue += hue
+				hueCount++
+				nonGrayPixels++
+
+				// 统计色调分布
+				category := getHueCategory(hue)
+				hueDistribution[category]++
+			}
+		}
+	}
+
+	if nonGrayPixels == 0 {
+		return 0.0, "灰色/无明显色调", nil
+	}
+
+	// 计算平均色调
+	averageHue := totalHue / float64(hueCount)
+
+	// 找到最主要的色调类别
+	mainCategory := "未知"
+	maxCount := 0
+	for cat, count := range hueDistribution {
+		if count > maxCount {
+			maxCount = count
+			mainCategory = cat
+		}
+	}
+
+	return averageHue, mainCategory, nil
+}
+
+func case9() {
+	filePath := "./output_case3.jpg"
+	hue, category, err := calculateImageHue(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 输出结果
+	fmt.Printf("图片色调分析:\n")
+	if hue >= 0 {
+		fmt.Printf("  平均色调角度: %.1f°\n", hue)
+	}
+	fmt.Printf("  主要色调类别: %s\n", category)
+}
+
+//	=========================================================================================================  计算图片的噪点值
+//	原理如下：
+//
+//	首先将图像转换为亮度矩阵，专注于亮度通道的变化
+//	使用 3x3 高斯模糊核创建图像的平滑版本，高斯模糊能有效去除高频噪声
+//	计算原始图像与平滑图像之间的差异，这种差异主要来自于噪点
+//	对所有像素的差异取平均值，作为整体噪点水平的度量
+
+// 计算图片的噪点值
+// 返回值越高，表示噪点越多
+func calculateImageNoise(filePath string) (float64, error) {
+	// 打开图片文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0.0, fmt.Errorf("无法打开文件: %v", err)
+	}
+	defer file.Close()
+
+	// 解码图片
+	var img image.Image
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.Decode(file)
+	case ".png":
+		img, err = png.Decode(file)
+	default:
+		return 0.0, fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	if err != nil {
+		return 0.0, fmt.Errorf("无法解码图片: %v", err)
+	}
+
+	// 获取图片边界
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	if width < 3 || height < 3 {
+		return 0.0, fmt.Errorf("图片尺寸过小，无法计算噪点")
+	}
+
+	// 创建亮度矩阵
+	luminance := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		luminance[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			luminance[y][x] = getLuminance(r8, g8, b8)
+		}
+	}
+
+	// 使用3x3高斯模糊核创建平滑图像
+	gaussianKernel := [3][3]float64{
+		{1, 2, 1},
+		{2, 4, 2},
+		{1, 2, 1},
+	}
+	kernelSum := 16.0 // 高斯核的总和
+
+	// 创建平滑后的亮度矩阵
+	smoothed := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		smoothed[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			// 边界像素直接使用原始值
+			if x == 0 || x == width-1 || y == 0 || y == height-1 {
+				smoothed[y][x] = luminance[y][x]
+				continue
+			}
+
+			// 应用高斯模糊
+			var sum float64
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					sum += luminance[y+ky][x+kx] * gaussianKernel[ky+1][kx+1]
+				}
+			}
+			smoothed[y][x] = sum / kernelSum
+		}
+	}
+
+	// 计算原始图像与平滑图像的差异（噪点估计）
+	var totalNoise float64
+	noiseCount := 0
+
+	// 忽略边缘像素
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			// 计算亮度差异的绝对值
+			diff := math.Abs(luminance[y][x] - smoothed[y][x])
+			totalNoise += diff
+			noiseCount++
+		}
+	}
+
+	// 计算平均噪点值
+	averageNoise := totalNoise / float64(noiseCount)
+	return averageNoise, nil
+}
+
+func case10() {
+	filePath := "./output_case3.jpg"
+	noise, err := calculateImageNoise(filePath)
+	if err != nil {
+		fmt.Printf("错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 判断噪点等级
+	var noiseLevel string
+	switch {
+	case noise < 0.01:
+		noiseLevel = "极低"
+	case noise < 0.03:
+		noiseLevel = "低"
+	case noise < 0.06:
+		noiseLevel = "中等"
+	case noise < 0.1:
+		noiseLevel = "高"
+	default:
+		noiseLevel = "极高"
+	}
+
+	fmt.Printf("图片噪点分析:\n")
+	fmt.Printf("  噪点值: %.4f\n", noise)
+	fmt.Printf("  噪点等级: %s\n", noiseLevel)
 }
