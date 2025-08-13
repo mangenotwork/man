@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
 	"image"
 	"image/color"
 	_ "image/gif" // 使用 _ 导入 image/gif、image/jpeg 和 image/png 包，这会调用这些包的 init 函数，从而注册相应的图像格式
@@ -15,9 +17,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-
-	_ "golang.org/x/image/bmp"
-	_ "golang.org/x/image/webp"
+	"runtime"
+	"sync"
 )
 
 func main() {
@@ -44,7 +45,15 @@ func main() {
 
 	// case11()
 
-	case12()
+	// case12()
+
+	// case13()
+
+	// case14()
+
+	// case15()
+
+	case16()
 }
 
 func ToBase64(b []byte) string {
@@ -1772,4 +1781,429 @@ func case12() {
 	}
 
 	println("反锯齿处理完成，结果已保存到", outputPath)
+}
+
+// ========================================================================================================= 实现对图像执行伽玛校正
+// 伽玛校正（Gamma Correction）是一种用于调整图像亮度和对比度的数字图像处理技术，其核心目的是补偿人类视觉系统对光线强度的非线性感知，
+// 以及设备（如显示器、相机）在图像采集或显示过程中产生的非线性失真
+//
+// 伽玛校正的本质是通过幂函数 “反向补偿” 非线性失真，让图像的亮度表现更贴近人类视觉的预期
+
+// 对图像执行伽玛校正
+func applyGammaCorrection(img image.Image, gamma float64) image.Image {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 创建输出图像
+	output := image.NewRGBA(bounds)
+
+	// 计算伽玛的倒数（优化计算效率）
+	invGamma := 1.0 / gamma
+
+	// 预计算伽玛校正查找表（0-255范围）
+	var gammaTable [256]uint8
+	for i := 0; i < 256; i++ {
+		// 将像素值归一化到0.0-1.0范围
+		normalized := float64(i) / 255.0
+		// 应用伽玛校正公式：I' = I^(1/γ)
+		corrected := math.Pow(normalized, invGamma)
+		// 转换回0-255范围并确保在有效区间内
+		gammaTable[i] = clampGM(corrected * 255.0)
+	}
+
+	// 遍历每个像素并应用伽玛校正
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取当前像素的RGBA值
+			r, g, b, a := img.At(x, y).RGBA()
+
+			// 将16位值转换为8位（RGBA()返回的是0-65535范围）
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			a8 := uint8(a >> 8)
+
+			// 应用预计算的伽玛校正表
+			rCorrected := gammaTable[r8]
+			gCorrected := gammaTable[g8]
+			bCorrected := gammaTable[b8]
+
+			// 设置校正后的像素值（alpha通道保持不变）
+			output.SetRGBA(x, y, color.RGBA{
+				R: rCorrected,
+				G: gCorrected,
+				B: bCorrected,
+				A: a8,
+			})
+		}
+	}
+
+	return output
+}
+
+// 确保值在0-255范围内
+func clampGM(value float64) uint8 {
+	if value < 0 {
+		return 0
+	}
+	if value > 255 {
+		return 255
+	}
+	return uint8(value + 0.5) // 四舍五入
+}
+
+func case13() {
+	// 输入输出文件路径
+	inputPath := "output_case2.jpg"    // 替换为你的输入图像路径
+	outputPath := "output_case2_2.jpg" // 校正后的输出路径
+	gammaValue := 0.2                  // 伽玛值（<1使图像变暗，>1使图像变亮）
+
+	// 加载图像
+	img, err := loadImage(inputPath)
+	if err != nil {
+		panic("无法加载图像: " + err.Error())
+	}
+
+	// 应用伽玛校正
+	correctedImg := applyGammaCorrection(img, gammaValue)
+
+	// 保存校正后的图像
+	err = saveImage(correctedImg, outputPath)
+	if err != nil {
+		panic("无法保存图像: " + err.Error())
+	}
+
+	println("伽玛校正完成，伽玛值为", gammaValue)
+	println("输出文件:", outputPath)
+}
+
+// ========================================================================================================= 直方图
+
+// 计算直方图数据
+func calculateHistogram(img image.Image) (rHist, gHist, bHist [256]int) {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 遍历每个像素，统计各通道像素值出现次数
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 将16位值转换为8位（0-255范围）
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 对应通道的直方图计数加1
+			rHist[r8]++
+			gHist[g8]++
+			bHist[b8]++
+		}
+	}
+
+	return rHist, gHist, bHist
+}
+
+// 找到直方图中的最大值（用于归一化）
+func findMax(hist [256]int) int {
+	max := 0
+	for _, v := range hist {
+		if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+// 绘制直方图图像
+func drawHistogram(rHist, gHist, bHist [256]int, width, height int) image.Image {
+	// 创建输出图像
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 填充白色背景
+	white := color.RGBA{255, 255, 255, 255}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, white)
+		}
+	}
+
+	// 找到三个通道的最大计数值
+	maxR := findMax(rHist)
+	maxG := findMax(gHist)
+	maxB := findMax(bHist)
+	maxCount := maxR
+	if maxG > maxCount {
+		maxCount = maxG
+	}
+	if maxB > maxCount {
+		maxCount = maxB
+	}
+
+	// 计算每个bin的宽度
+	binWidth := width / 256
+
+	// 绘制三个通道的直方图
+	for i := 0; i < 256; i++ {
+		// 计算每个通道的高度（归一化到图像高度）
+		rHeight := int(float64(rHist[i]) / float64(maxCount) * float64(height-10))
+		gHeight := int(float64(gHist[i]) / float64(maxCount) * float64(height-10))
+		bHeight := int(float64(bHist[i]) / float64(maxCount) * float64(height-10))
+
+		// 计算x坐标
+		x := i * binWidth
+
+		// 绘制红色通道（R）
+		drawBar(img, x, height-1, binWidth-1, rHeight, color.RGBA{255, 0, 0, 200})
+
+		// 绘制绿色通道（G）
+		drawBar(img, x, height-1-rHeight, binWidth-1, gHeight, color.RGBA{0, 255, 0, 200})
+
+		// 绘制蓝色通道（B）
+		drawBar(img, x, height-1-rHeight-gHeight, binWidth-1, bHeight, color.RGBA{0, 0, 255, 200})
+	}
+
+	return img
+}
+
+// 绘制单个直方图条
+func drawBar(img *image.RGBA, x, y, width, height int, c color.RGBA) {
+	// 确保高度不为负
+	if height <= 0 {
+		return
+	}
+
+	// 计算起始y坐标（图像坐标系y轴向下为正）
+	startY := y - height
+
+	// 绘制矩形条
+	for dy := 0; dy < height; dy++ {
+		for dx := 0; dx < width; dx++ {
+			imgX := x + dx
+			imgY := startY + dy
+			// 确保坐标在图像范围内
+			if imgX < img.Bounds().Max.X && imgY >= 0 && imgY < img.Bounds().Max.Y {
+				img.Set(imgX, imgY, c)
+			}
+		}
+	}
+}
+
+func case14() {
+	// 配置参数
+	inputPath := "test2.jpg"      // 输入图像路径
+	outputPath := "histogram.png" // 直方图输出路径
+	histWidth := 800              // 直方图图像宽度
+	histHeight := 400             // 直方图图像高度
+
+	// 加载图像
+	img, err := loadImage(inputPath)
+	if err != nil {
+		panic("无法加载图像: " + err.Error())
+	}
+
+	// 计算直方图数据
+	rHist, gHist, bHist := calculateHistogram(img)
+
+	// 绘制直方图
+	histImage := drawHistogram(rHist, gHist, bHist, histWidth, histHeight)
+
+	// 保存直方图
+	err = saveImage(histImage, outputPath)
+	if err != nil {
+		panic("无法保存直方图: " + err.Error())
+	}
+
+	println("直方图生成完成，已保存到", outputPath)
+}
+
+// ========================================================================================================= 返回直方图的值
+
+// 修改图像的直方图数值（即调整像素值的分布），本质上是改变图像中像素的亮度、颜色或对比度分布，最终会直接影响图像的视觉效果
+// 图像的直方图本质是 “像素值分布的数学描述”，修改直方图的过程，其实是通过数学映射（如灰度变换）调整每个像素的实际值。这种调整直接反
+// 映在图像的亮度、对比度、颜色偏向和细节表现上，是图像增强、校正（如伽玛校正）、风格化处理的核心原理。例如，相机的 “对比度调节”“亮度
+// 调节” 功能，本质就是在动态修改图像的直方图分布。
+
+// 计算图像的RGB三通道直方图，返回归一化后的float64切片
+// 返回值依次为：红色通道直方图、绿色通道直方图、蓝色通道直方图
+func CalculateNormalizedHistograms(img image.Image) (rHist, gHist, bHist []float64) {
+	// 初始化三个通道的直方图数组（0-255共256个区间）
+	rCounts := [256]int{}
+	gCounts := [256]int{}
+	bCounts := [256]int{}
+
+	// 获取图像边界并计算总像素数
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	totalPixels := width * height
+	if totalPixels == 0 {
+		// 空图像返回全零切片
+		return make([]float64, 256), make([]float64, 256), make([]float64, 256)
+	}
+
+	// 遍历每个像素，统计各通道像素值出现次数
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素的RGBA值（返回的是0-65535范围的16位值）
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 转换为8位值（0-255范围）
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 对应通道的计数加1
+			rCounts[r8]++
+			gCounts[g8]++
+			bCounts[b8]++
+		}
+	}
+
+	// 归一化：将计数值转换为占总像素数的比例（0.0-1.0）
+	rHist = make([]float64, 256)
+	gHist = make([]float64, 256)
+	bHist = make([]float64, 256)
+
+	for i := 0; i < 256; i++ {
+		rHist[i] = float64(rCounts[i]) / float64(totalPixels)
+		gHist[i] = float64(gCounts[i]) / float64(totalPixels)
+		bHist[i] = float64(bCounts[i]) / float64(totalPixels)
+	}
+
+	return rHist, gHist, bHist
+}
+
+func case15() {
+	// 示例用法
+	inputPath := "test2.jpg" // 替换为你的图像路径
+
+	// 加载图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开图像文件: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图像: " + err.Error())
+	}
+
+	// 计算直方图
+	rHist, gHist, bHist := CalculateNormalizedHistograms(img)
+
+	// 打印部分结果（示例）
+	println("红色通道直方图部分值:")
+	for i := 0; i < 10; i++ { // 打印前10个值
+		fmt.Printf("值 %d: %.6f\n", i, rHist[i])
+	}
+
+	println("\n绿色通道直方图部分值:")
+	for i := 245; i < 256; i++ { // 打印最后11个值
+		fmt.Printf("值 %d: %.6f\n", i, gHist[i])
+	}
+
+	println("\n蓝色通道直方图部分值:")
+	for i := 245; i < 256; i++ { // 打印最后11个值
+		fmt.Printf("值 %d: %.6f\n", i, bHist[i])
+	}
+}
+
+// ========================================================================================================= 实现提高图片亮度，使用并发来提高处理速度
+
+// 并发调整图像亮度
+// brightnessDelta: 亮度增量（-255到255之间，正值提高亮度，负值降低亮度）
+func adjustBrightnessConcurrent(img image.Image, brightnessDelta int) image.Image {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	output := image.NewRGBA(bounds)
+
+	// 转换为RGBA用于快速像素访问
+	rgbaImg := image.NewRGBA(bounds)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			rgbaImg.Set(x, y, img.At(x, y))
+		}
+	}
+
+	// 根据CPU核心数确定并发goroutine数量
+	numWorkers := runtime.NumCPU()
+	rowsPerWorker := height / numWorkers
+	var wg sync.WaitGroup
+
+	// 分割图像行，分配给不同的goroutine处理
+	for i := 0; i < numWorkers; i++ {
+		startY := i * rowsPerWorker
+		endY := startY + rowsPerWorker
+
+		// 最后一个worker处理剩余的行
+		if i == numWorkers-1 {
+			endY = height
+		}
+
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			// 处理当前范围内的所有行
+			for y := start; y < end; y++ {
+				for x := 0; x < width; x++ {
+					// 获取像素的RGBA值（0-65535范围）
+					r, g, b, a := rgbaImg.At(x, y).RGBA()
+
+					// 转换为8位值（0-255）并调整亮度
+					r8 := clampInt(int(r>>8)+brightnessDelta, 0, 255)
+					g8 := clampInt(int(g>>8)+brightnessDelta, 0, 255)
+					b8 := clampInt(int(b>>8)+brightnessDelta, 0, 255)
+					a8 := uint8(a >> 8) // Alpha通道不变
+
+					// 设置调整后的像素值
+					output.SetRGBA(x, y, color.RGBA{
+						R: uint8(r8),
+						G: uint8(g8),
+						B: uint8(b8),
+						A: a8,
+					})
+				}
+			}
+		}(startY, endY)
+	}
+
+	// 等待所有goroutine完成
+	wg.Wait()
+	return output
+}
+
+func clampInt(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func case16() {
+	// 配置参数
+	inputPath := "test2.jpg"    // 输入图像路径
+	outputPath := "test2_1.jpg" // 输出图像路径
+	brightnessDelta := 50       // 亮度增量（可调整范围：-255到255）
+
+	// 加载图像
+	img, err := loadImage(inputPath)
+	if err != nil {
+		panic("无法加载图像: " + err.Error())
+	}
+
+	// 并发调整亮度
+	adjustedImg := adjustBrightnessConcurrent(img, brightnessDelta)
+
+	// 保存调整后的图像
+	err = saveImage(adjustedImg, outputPath)
+	if err != nil {
+		panic("无法保存图像: " + err.Error())
+	}
+
+	println("亮度调整完成，增量为", brightnessDelta)
+	println("输出文件:", outputPath)
 }
