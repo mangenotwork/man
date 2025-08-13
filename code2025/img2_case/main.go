@@ -40,7 +40,11 @@ func main() {
 
 	// case9()
 
-	case10()
+	// case10()
+
+	// case11()
+
+	case12()
 }
 
 func ToBase64(b []byte) string {
@@ -1461,4 +1465,311 @@ func case10() {
 	fmt.Printf("图片噪点分析:\n")
 	fmt.Printf("  噪点值: %.4f\n", noise)
 	fmt.Printf("  噪点等级: %s\n", noiseLevel)
+}
+
+//	=========================================================================================================  图片反锯齿
+// 核心思路是通过超采样（Super Sampling）来实现 - 先创建更高分辨率的图像，绘制后再缩小到原始尺寸，从而自然产生平滑边缘。
+
+// 超采样因子，值越大抗锯齿效果越好，但性能消耗也越大
+const sampleFactor = 4
+
+// 绘制一条线并应用反锯齿
+func drawLineWithAA(img *image.RGBA, x0, y0, x1, y1 int, c color.Color) {
+	// 创建高分辨率的临时图像用于超采样
+	width := img.Bounds().Dx()
+	height := img.Bounds().Dy()
+	superImg := image.NewRGBA(image.Rect(0, 0, width*sampleFactor, height*sampleFactor))
+
+	// 在高分辨率图像上绘制线条
+	drawLine(superImg, x0*sampleFactor, y0*sampleFactor,
+		x1*sampleFactor, y1*sampleFactor, c)
+
+	// 将高分辨率图像缩小到原始尺寸，实现反锯齿
+	downsample(img, superImg)
+}
+
+// 基本的 Bresenham 线绘制算法
+func drawLine(img *image.RGBA, x0, y0, x1, y1 int, c color.Color) {
+	dx := abs(x1 - x0)
+	dy := abs(y1 - y0)
+	sx, sy := 1, 1
+
+	if x0 > x1 {
+		sx = -1
+	}
+	if y0 > y1 {
+		sy = -1
+	}
+
+	err := dx - dy
+
+	for {
+		img.Set(x0, y0, c)
+		if x0 == x1 && y0 == y1 {
+			break
+		}
+		e2 := 2 * err
+		if e2 > -dy {
+			err -= dy
+			x0 += sx
+		}
+		if e2 < dx {
+			err += dx
+			y0 += sy
+		}
+	}
+}
+
+// 将高分辨率图像缩小到目标尺寸
+func downsample(dst, src *image.RGBA) {
+	bounds := dst.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// 对每个目标像素，取对应高分辨率区域的平均值
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			var r, g, b, a uint32
+			count := 0
+
+			// 计算高分辨率图像中的对应区域
+			startX := x * sampleFactor
+			startY := y * sampleFactor
+			endX := startX + sampleFactor
+			endY := startY + sampleFactor
+
+			// 累加区域内所有像素的颜色值
+			for sy := startY; sy < endY; sy++ {
+				for sx := startX; sx < endX; sx++ {
+					r1, g1, b1, a1 := src.At(sx, sy).RGBA()
+					r += r1
+					g += g1
+					b += b1
+					a += a1
+					count++
+				}
+			}
+
+			// 计算平均值并设置到目标像素
+			avgR := uint8((r / uint32(count)) >> 8)
+			avgG := uint8((g / uint32(count)) >> 8)
+			avgB := uint8((b / uint32(count)) >> 8)
+			avgA := uint8((a / uint32(count)) >> 8)
+
+			dst.SetRGBA(x, y, color.RGBA{avgR, avgG, avgB, avgA})
+		}
+	}
+}
+
+// 辅助函数：计算绝对值
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func case11() {
+	// 创建一个 400x400 的图像
+	width, height := 400, 400
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 填充白色背景
+	white := color.RGBA{255, 255, 255, 255}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, white)
+		}
+	}
+
+	// 绘制一条对角线，应用反锯齿
+	red := color.RGBA{255, 0, 0, 255}
+	drawLineWithAA(img, 50, 50, 350, 350, red)
+
+	// 保存图像
+	outputFile, err := os.Create("anti_aliasing_example.png")
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+
+	png.Encode(outputFile, img)
+}
+
+// =========================================================================================================  golang 实现处理输入图片的反锯齿
+
+// 加载图片（支持PNG和JPEG）
+func loadImage(path string) (image.Image, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	return img, err
+}
+
+// 保存图片（根据扩展名自动选择格式）
+func saveImage(img image.Image, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	switch ext := filepath.Ext(path); ext {
+	case ".png":
+		return png.Encode(file, img)
+	case ".jpg", ".jpeg":
+		return jpeg.Encode(file, img, &jpeg.Options{Quality: 90})
+	default:
+		return png.Encode(file, img) // 默认保存为PNG
+	}
+}
+
+// 将图片转换为RGBA格式以便像素级操作
+func toRGBA(img image.Image) *image.RGBA {
+	bounds := img.Bounds()
+	rgba := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			rgba.Set(x, y, img.At(x, y))
+		}
+	}
+	return rgba
+}
+
+// 计算像素亮度（用于边缘检测）
+func luminance(c color.Color) float64 {
+	r, g, b, _ := c.RGBA()
+	// 转换为0-1范围
+	r = r >> 8
+	g = g >> 8
+	b = b >> 8
+	// 亮度公式（ITU-R BT.601）
+	return 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+}
+
+// 检测是否为边缘像素（通过与周围像素的亮度差判断）
+func isEdgePixel(img *image.RGBA, x, y int, threshold float64) bool {
+	bounds := img.Bounds()
+	if x <= bounds.Min.X || x >= bounds.Max.X-1 ||
+		y <= bounds.Min.Y || y >= bounds.Max.Y-1 {
+		return false // 边缘像素不处理
+	}
+
+	// 当前像素亮度
+	current := luminance(img.At(x, y))
+
+	// 检查上下左右四个方向的像素
+	dirs := [][]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+	for _, d := range dirs {
+		nx, ny := x+d[0], y+d[1]
+		neighbor := luminance(img.At(nx, ny))
+		if absf64(current-neighbor) > threshold {
+			return true
+		}
+	}
+	return false
+}
+
+// 对边缘像素应用3x3高斯模糊平滑处理
+func applyAntiAliasing(img *image.RGBA) *image.RGBA {
+	bounds := img.Bounds()
+	result := image.NewRGBA(bounds)
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 3x3高斯核（已归一化）
+	gaussianKernel := [3][3]float64{
+		{1, 2, 1},
+		{2, 4, 2},
+		{1, 2, 1},
+	}
+	total := 16.0 // 核总和，用于归一化
+
+	// 边缘检测阈值（可根据需要调整）
+	edgeThreshold := 30.0
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 非边缘像素直接复制
+			if !isEdgePixel(img, x, y, edgeThreshold) {
+				result.Set(x, y, img.At(x, y))
+				continue
+			}
+
+			// 对边缘像素应用高斯模糊
+			var r, g, b, a float64
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					nx, ny := x+kx, y+ky
+					// 处理边界
+					if nx < 0 {
+						nx = 0
+					} else if nx >= width {
+						nx = width - 1
+					}
+					if ny < 0 {
+						ny = 0
+					} else if ny >= height {
+						ny = height - 1
+					}
+
+					// 获取像素值并应用权重
+					pixel := img.At(nx, ny)
+					pr, pg, pb, pa := pixel.RGBA()
+					weight := gaussianKernel[ky+1][kx+1] / total
+
+					r += float64(pr>>8) * weight
+					g += float64(pg>>8) * weight
+					b += float64(pb>>8) * weight
+					a += float64(pa>>8) * weight
+				}
+			}
+
+			// 设置处理后的像素值
+			result.SetRGBA(x, y, color.RGBA{
+				R: uint8(clamp(r, 0, 255)),
+				G: uint8(clamp(g, 0, 255)),
+				B: uint8(clamp(b, 0, 255)),
+				A: uint8(clamp(a, 0, 255)),
+			})
+		}
+	}
+	return result
+}
+
+// 辅助函数：计算绝对值
+func absf64(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func case12() {
+	// 输入输出文件路径
+	inputPath := "output_case2.jpg"    // 替换为你的输入图片路径
+	outputPath := "output_case2_1.jpg" // 处理后的输出路径
+
+	// 加载图片
+	img, err := loadImage(inputPath)
+	if err != nil {
+		panic("无法加载图片: " + err.Error())
+	}
+
+	// 转换为RGBA以便处理
+	rgbaImg := toRGBA(img)
+
+	// 应用反锯齿处理
+	processedImg := applyAntiAliasing(rgbaImg)
+
+	// 保存处理后的图片
+	err = saveImage(processedImg, outputPath)
+	if err != nil {
+		panic("无法保存图片: " + err.Error())
+	}
+
+	println("反锯齿处理完成，结果已保存到", outputPath)
 }
