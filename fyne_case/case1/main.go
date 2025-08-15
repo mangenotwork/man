@@ -6,8 +6,11 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"image/color"
+	"log"
 	"time"
 )
 
@@ -22,7 +25,22 @@ func main() {
 	w := a.NewWindow("李漫")
 	fmt.Println("窗口创建完成") // 日志3
 
-	contentBox := container.NewVBox()
+	// 工具栏
+	toolbar := widget.NewToolbar(
+		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() {
+			log.Println("新建文档")
+		}),
+		widget.NewToolbarSeparator(),
+		widget.NewToolbarAction(theme.ContentCutIcon(), func() {}),
+		widget.NewToolbarAction(theme.ContentCopyIcon(), func() {}),
+		widget.NewToolbarAction(theme.ContentPasteIcon(), func() {}),
+		widget.NewToolbarSpacer(),
+		widget.NewToolbarAction(theme.HelpIcon(), func() {
+			log.Println("显示帮助")
+		}),
+	)
+
+	contentBox := container.NewBorder(toolbar, nil, nil, nil, widget.NewLabel("内容"))
 	contentBox.Add(widget.NewLabel("Hello, World!"))
 	fmt.Println("内容设置完成") // 日志4
 
@@ -43,7 +61,18 @@ func main() {
 		}
 	}()
 
+	if desk, ok := a.(desktop.App); ok {
+		m := fyne.NewMenu("MyApp",
+			fyne.NewMenuItem("Show", func() {
+				w.Show()
+			}))
+		desk.SetSystemTrayMenu(m)
+	}
+
 	w.SetContent(contentBox)
+	w.SetCloseIntercept(func() {
+		w.Hide()
+	})
 	w.ShowAndRun()
 	fmt.Println("事件循环启动") // 日志5（这行可能不会执行，因为ShowAndRun会阻塞）
 }
