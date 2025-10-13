@@ -1,144 +1,119 @@
 package main
 
 import (
-	"image/color"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
-// 自定义数据结构：表示目录树节点
-type TreeNode struct {
-	ID       string      // 节点唯一标识
-	Name     string      // 节点显示名称
-	Children []*TreeNode // 子节点
-	IsFile   bool        // 区分文件(叶子)和文件夹(分支)
+// 1. 翻译映射表
+var translations = map[string]map[string]string{
+	"en": {
+		"appTitle":  "Auto Multi-language",
+		"welcome":   "Welcome to the example",
+		"inputHint": "Enter text here",
+		"switchBtn": "Switch to Chinese",
+		"submitBtn": "Submit",
+	},
+	"zh-CN": {
+		"appTitle":  "自动多语言示例",
+		"welcome":   "欢迎使用本示例",
+		"inputHint": "在此输入文本",
+		"switchBtn": "切换到英文",
+		"submitBtn": "提交",
+	},
+}
+
+// 2. 全局状态：当前语言+组件映射表（自动关联翻译键和组件）
+var (
+	currentLang = "en"
+	// 存储需要翻译的组件：key是翻译键，value是组件和更新方法
+	translatableComponents = struct {
+		sync.Mutex
+		list map[string][]interface{} // 支持多种组件类型（Label/Button/Entry等）
+	}{
+		list: make(map[string][]interface{}),
+	}
+)
+
+// 3. 核心函数：注册组件与翻译键（一行代码完成关联）
+// 支持 Label/Button/Entry.PlaceHolder 等常见组件
+func registerTranslatable(key string, component interface{}) {
+	translatableComponents.Lock()
+	defer translatableComponents.Unlock()
+	translatableComponents.list[key] = append(translatableComponents.list[key], component)
+}
+
+// 4. 翻译函数：获取当前语言的文本
+func t(key string) string {
+	if langMap, ok := translations[currentLang]; ok {
+		if text, ok := langMap[key]; ok {
+			return text
+		}
+	}
+	return translations["en"][key] // 默认英文
+}
+
+// 5. 切换语言并自动更新所有组件（核心：批量刷新）
+func switchLang() {
+	// 切换当前语言
+	if currentLang == "en" {
+		currentLang = "zh-CN"
+	} else {
+		currentLang = "en"
+	}
+
+	// 遍历所有注册的组件，自动更新文本（无需手动写每个组件的刷新逻辑）
+	translatableComponents.Lock()
+	defer translatableComponents.Unlock()
+	for key, components := range translatableComponents.list {
+		text := t(key)
+		for _, comp := range components {
+			switch c := comp.(type) {
+			case *widget.Label:
+				c.SetText(text)
+			case *widget.Button:
+				c.SetText(text)
+			case *widget.Entry:
+				c.SetPlaceHolder(text) // Entry 适配占位文本
+			}
+		}
+	}
 }
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("Tree组件数据绑定示例")
+	myWindow := myApp.NewWindow(t("appTitle"))
 
-	// 1. 准备数据源（模拟目录结构）
-	rootNodes := []*TreeNode{
-		{
-			ID:   "docs",
-			Name: "文档",
-			Children: []*TreeNode{
-				{ID: "doc1", Name: "报告.docx", IsFile: true},
-				{ID: "doc2", Name: "计划.xlsx", IsFile: true},
-			},
-			IsFile: false,
-		},
-		{
-			ID:   "images",
-			Name: "图片",
-			Children: []*TreeNode{
-				{ID: "img1", Name: "截图1.png", IsFile: true},
-				{ID: "img2", Name: "截图2.png", IsFile: true},
-			},
-			IsFile: false,
-		},
-		{ID: "readme", Name: "说明.txt", IsFile: true},
-	}
+	// 6. 创建原生组件并关联翻译键（仅需一行注册代码）
+	welcomeLabel := widget.NewLabel(t("welcome"))
+	registerTranslatable("welcome", welcomeLabel) // 关联标签
+	welcomeLabel2 := widget.NewLabel(t("welcome"))
+	registerTranslatable("welcome", welcomeLabel2) // 关联标签
 
-	// 2. 构建节点ID与数据的映射
-	nodeMap := make(map[string]*TreeNode)
-	var buildNodeMap func(parentID string, nodes []*TreeNode)
-	buildNodeMap = func(parentID string, nodes []*TreeNode) {
-		for _, node := range nodes {
-			fullID := parentID + "/" + node.ID
-			if parentID == "" {
-				fullID = node.ID // 根节点ID
-			}
-			nodeMap[fullID] = node
+	inputEntry := widget.NewEntry()
+	inputEntry.SetPlaceHolder(t("inputHint"))
+	registerTranslatable("inputHint", inputEntry) // 关联输入框占位符
 
-			if len(node.Children) > 0 {
-				buildNodeMap(fullID, node.Children)
-			}
-		}
-	}
-	buildNodeMap("", rootNodes)
+	submitBtn := widget.NewButton(t("submitBtn"), func() {})
+	registerTranslatable("submitBtn", submitBtn) // 关联按钮
 
-	// 3. 创建Tree组件并绑定数据
-	tree := widget.NewTree(
-		// 回调1：获取子节点ID列表
-		func(id widget.TreeNodeID) []widget.TreeNodeID {
-			if id == "" { // 根节点
-				ids := make([]widget.TreeNodeID, len(rootNodes))
-				for i, node := range rootNodes {
-					ids[i] = node.ID
-				}
-				return ids
-			}
+	switchBtn := widget.NewButton(t("switchBtn"), switchLang)
+	registerTranslatable("switchBtn", switchBtn) // 关联切换按钮
 
-			if node, ok := nodeMap[id]; ok {
-				ids := make([]widget.TreeNodeID, len(node.Children))
-				for i, child := range node.Children {
-					ids[i] = id + "/" + child.ID
-				}
-				return ids
-			}
-			return nil
-		},
-
-		// 回调2：判断是否为叶子节点
-		func(id widget.TreeNodeID) bool {
-			if node, ok := nodeMap[id]; ok {
-				return node.IsFile
-			}
-			return false
-		},
-
-		// 回调3：创建节点UI组件（关键修改：提前设置颜色）
-		func(branch bool) fyne.CanvasObject {
-			if branch {
-				// 分支节点：创建带样式的标签（加粗+黑色）
-				label := widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-				// 用CanvasObject包装以支持颜色设置
-				return label
-			} else {
-				// 叶子节点：使用canvas.Text直接设置颜色
-				text := canvas.NewText("", color.Gray{80})
-				text.TextSize = 14 // 与Label保持一致的字体大小
-				return text
-			}
-		},
-
-		// 回调4：更新节点显示内容
-		func(id widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
-			if node, ok := nodeMap[id]; ok {
-				if branch {
-					// 分支节点：更新Label文本
-					o.(*widget.Label).SetText(node.Name)
-				} else {
-					// 叶子节点：更新canvas.Text文本
-					o.(*canvas.Text).Text = node.Name
-					o.(*canvas.Text).Refresh() // 刷新显示
-				}
-			}
-		},
+	// 布局
+	content := container.NewVBox(
+		welcomeLabel,
+		welcomeLabel2,
+		inputEntry,
+		submitBtn,
+		switchBtn,
 	)
 
-	// 4. 节点选择事件
-	tree.OnSelected = func(id widget.TreeNodeID) {
-		if node, ok := nodeMap[id]; ok {
-			myWindow.SetTitle("选中: " + node.Name)
-		}
-	}
-
-	// 布局设置
-	leftContainer := container.New(layout.NewStackLayout(), tree)
-
-	middle := canvas.NewText("选择左侧文件/文件夹查看详情", color.Black)
-	mainContainer := container.NewHSplit(leftContainer, container.NewVBox(middle))
-	mainContainer.SetOffset(0.25)
-
-	myWindow.SetContent(mainContainer)
-	myWindow.Resize(fyne.NewSize(800, 500))
+	myWindow.SetContent(content)
+	myWindow.Resize(fyne.NewSize(400, 250))
 	myWindow.ShowAndRun()
 }

@@ -94,7 +94,7 @@ func main() {
 
 	// case40()
 
-	// case41()
+	case41()
 
 	// case42()
 
@@ -132,7 +132,7 @@ func main() {
 
 	// case59()
 
-	case60()
+	// case60()
 }
 
 func getTestImg() image.Image {
