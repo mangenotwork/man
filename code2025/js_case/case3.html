@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单文本显示Web组件</title>
+    <style>
+        body {
+            padding: 2rem;
+            font-family: sans-serif;
+        }
+        /* 外部样式不会影响组件内部（因为使用了Shadow DOM） */
+        .text-display {
+            color: red; /* 这个样式对组件无效 */
+        }
+    </style>
+</head>
+<body>
+    <h3>直接在HTML中使用：</h3>
+    <!-- 直接在HTML中通过text属性传递文本 -->
+    <text-display text="这是一段通过HTML属性传递的文本"></text-display>
+
+    <h3>通过JS动态创建：</h3>
+    <div id="container"></div>
+
+    <script>
+        // 定义文本显示组件
+        class TextDisplay extends HTMLElement {
+            constructor() {
+                super();
+                // 创建Shadow DOM（样式和结构隔离）
+                this.attachShadow({ mode: 'open' });
+            }
+
+            // 声明需要监听的属性（这里只监听text属性）
+            static get observedAttributes() {
+                return ['text'];
+            }
+
+            // 当组件挂载到页面时触发
+            connectedCallback() {
+                this.render(); // 初始渲染
+            }
+
+            // 当监听的属性变化时触发
+            attributeChangedCallback(attrName, oldVal, newVal) {
+                if (attrName === 'text' && oldVal !== newVal) {
+                    this.render(); // 属性变化时重新渲染
+                }
+            }
+
+            // 渲染组件内容
+            render() {
+                // 获取text属性值（默认显示"无文本"）
+                const text = this.getAttribute('text') || '无文本';
+                
+                // 向Shadow DOM中插入内容（包含简单样式）
+                this.shadowRoot.innerHTML = `
+                    <style>
+                        /* 组件内部样式，仅影响组件自身 */
+                        .text-content {
+                            padding: 1rem;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            background: #f9f9f9;
+                        }
+                    </style>
+                    <div class="text-content">${text}</div>
+                `;
+            }
+        }
+
+        // 注册自定义组件（标签名为text-display）
+        customElements.define('text-display', TextDisplay);
+
+        // 演示：通过JS动态创建组件并设置文本
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('container');
+            
+            // 创建组件实例
+            const dynamicText = document.createElement('text-display');
+            // 设置文本参数（会触发attributeChangedCallback）
+            dynamicText.setAttribute('text', '这是通过JavaScript动态设置的文本');
+            
+            container.appendChild(dynamicText);
+
+            // 3秒后动态修改文本（演示属性更新）
+            setTimeout(() => {
+                dynamicText.setAttribute('text', '3秒后更新的文本内容');
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
