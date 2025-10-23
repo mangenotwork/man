@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机点无限扩散</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            background: #0a0a0f; /* 深色背景增强视觉效果 */
+            height: 100vh;
+        }
+        .dot {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            opacity: 1;
+            pointer-events: none; /* 避免鼠标交互干扰 */
+            /* 扩散动画：scale从0到最大，opacity从1到0 */
+            animation:扩散 linear forwards;
+        }
+
+        @keyframes 扩散 {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            70% {
+                opacity: 0.7; /* 中间阶段保持一定透明度 */
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+<script>
+    // 配置参数（可调整效果）
+    const config = {
+        minSize: 100,        // 点最小扩散直径(px)
+        maxSize: 666,       // 点最大扩散直径(px)
+        minDuration: 2000,  // 最小扩散时间(ms)
+        maxDuration: 7000,  // 最大扩散时间(ms)
+        spawnInterval: 100, // 生成新点的间隔(ms)
+        maxDots: 70,        // 同时存在的最大点数（控制性能）
+        minHue: 0,          // 最小色相(0-360)
+        maxHue: 360         // 最大色相(0-360)
+    };
+
+    // 生成随机颜色（使用HSV更易控制色彩范围）
+    function getRandomColor() {
+        const hue = Math.random() * (config.maxHue - config.minHue) + config.minHue;
+        const saturation = 70 + Math.random() * 30; // 70%-100% 饱和度
+        const lightness = 40 + Math.random() * 30;  // 40%-70% 亮度
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
+
+    // 生成随机位置（在视口范围内）
+    function getRandomPosition(size) {
+        const x = Math.random() * (window.innerWidth - size);
+        const y = Math.random() * (window.innerHeight - size);
+        return { x, y };
+    }
+
+    // 创建一个扩散点
+    function createDot() {
+        // 随机参数
+        const size = config.minSize + Math.random() * (config.maxSize - config.minSize);
+        const duration = config.minDuration + Math.random() * (config.maxDuration - config.minDuration);
+        const color = getRandomColor();
+        const { x, y } = getRandomPosition(size);
+
+        // 创建元素
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+
+        // 设置样式
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.left = `${x}px`;
+        dot.style.top = `${y}px`;
+        dot.style.backgroundColor = color;
+        dot.style.boxShadow = `0 0 ${size/2}px ${color}`; // 增加发光效果
+        dot.style.animationDuration = `${duration}ms`;
+
+        // 添加到页面
+        document.body.appendChild(dot);
+
+        // 动画结束后移除元素（避免内存泄漏）
+        setTimeout(() => {
+            dot.remove();
+        }, duration);
+    }
+
+    // 控制生成频率，避免过多点导致性能问题
+    let currentDotCount = 0;
+    setInterval(() => {
+        if (currentDotCount < config.maxDots) {
+            createDot();
+            currentDotCount++;
+            // 延迟减少计数（避免瞬时峰值）
+            setTimeout(() => currentDotCount--, 500);
+        }
+    }, config.spawnInterval);
+
+    // 窗口大小变化时调整视口（可选）
+    window.addEventListener('resize', () => {
+        // 清除现有点（可选，避免位置错乱）
+        document.querySelectorAll('.dot').forEach(dot => dot.remove());
+        currentDotCount = 0;
+    });
+</script>
+</body>
+</html>
