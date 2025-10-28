@@ -133,6 +133,18 @@ func main() {
 	// case59()
 
 	// case60()
+
+	// case61()
+
+	// case62()
+
+	// case63()
+
+	// case64()
+
+	// case65()
+
+	case66()
 }
 
 func getTestImg() image.Image {
@@ -4637,7 +4649,740 @@ func gaussianBlur(src image.Image, kernel [][]float64) image.Image {
 
 // ========================================================================
 
+// case61 计算图片的RGB分量矩阵
+// RGB 分量矩阵本质是通过调整红、绿、蓝三通道的权重比例，实现对色彩的精准控制。它是一种线性变换工具，
+//核心是用 3x3 矩阵定义每个输出通道（R/G/B）由输入三通道按何种比例混合而成。
+
+// 实用价值
+//图像分析：通过协方差矩阵判断通道相关性（如风景图中 G 和 B 通道通常正相关，因绿色植物和蓝色天空常共存）。
+//色彩校正：根据通道方差调整对比度（方差小的通道需增强反差）。
+//特征提取：作为图像识别的预处理特征，反映色彩分布规律。
+
+func case61() {
+	src := getTest2Img()
+	// 提取RGB分量
+	rgbValues := ExtractRGB(src)
+	fmt.Printf("图片尺寸: %dx%d, 总像素: %d\n",
+		src.Bounds().Max.X, src.Bounds().Max.Y, len(rgbValues))
+
+	// 计算协方差矩阵
+	covMatrix := ComputeCovarianceMatrix(rgbValues)
+
+	// 打印结果（保留2位小数）
+	fmt.Println("RGB分量协方差矩阵:")
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			fmt.Printf("%.2f\t", covMatrix[i][j])
+		}
+		fmt.Println()
+	}
+}
+
+// RGBValue 存储单个像素的RGB值（0-255）
+type RGBValue struct {
+	R, G, B uint8
+}
+
+// ExtractRGB 提取图片中所有像素的RGB值
+func ExtractRGB(img image.Image) []RGBValue {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	rgbValues := make([]RGBValue, 0, width*height)
+
+	// 遍历每个像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素颜色（RGBA格式，含Alpha通道）
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// 转换为0-255范围（RGBA返回的是0-65535，右移8位等价于除以256）
+			rgb := RGBValue{
+				R: uint8(r >> 8),
+				G: uint8(g >> 8),
+				B: uint8(b >> 8),
+			}
+			rgbValues = append(rgbValues, rgb)
+		}
+	}
+	return rgbValues
+}
+
+// ComputeCovarianceMatrix 计算RGB三通道的协方差矩阵（3x3）
+// 矩阵含义：Cov[i][j]表示第i通道与第j通道的协方差（i,j=0:R,1:G,2:B）
+func ComputeCovarianceMatrix(rgbValues []RGBValue) [3][3]float64 {
+	n := len(rgbValues)
+	if n == 0 {
+		return [3][3]float64{}
+	}
+
+	// 1. 计算三通道的均值
+	var meanR, meanG, meanB float64
+	for _, rgb := range rgbValues {
+		meanR += float64(rgb.R)
+		meanG += float64(rgb.G)
+		meanB += float64(rgb.B)
+	}
+	meanR /= float64(n)
+	meanG /= float64(n)
+	meanB /= float64(n)
+
+	// 2. 计算协方差矩阵元素
+	var cov [3][3]float64
+	for _, rgb := range rgbValues {
+		r := float64(rgb.R) - meanR
+		g := float64(rgb.G) - meanG
+		b := float64(rgb.B) - meanB
+
+		cov[0][0] += r * r // Cov(R,R)
+		cov[0][1] += r * g // Cov(R,G)
+		cov[0][2] += r * b // Cov(R,B)
+		cov[1][1] += g * g // Cov(G,G)
+		cov[1][2] += g * b // Cov(G,B)
+		cov[2][2] += b * b // Cov(B,B)
+	}
+
+	// 协方差公式：E[(X-μX)(Y-μY)]，除以n-1（无偏估计）
+	divisor := float64(n - 1)
+	if divisor == 0 {
+		divisor = 1 // 避免除以0（单像素情况）
+	}
+	cov[0][0] /= divisor
+	cov[0][1] /= divisor
+	cov[0][2] /= divisor
+	cov[1][0] = cov[0][1] // 协方差矩阵对称
+	cov[1][1] /= divisor
+	cov[1][2] /= divisor
+	cov[2][0] = cov[0][2]
+	cov[2][1] = cov[1][2]
+	cov[2][2] /= divisor
+
+	return cov
+}
+
 // ========================================================================
 
+// case62 计算图片的RGB分量矩阵 - 打印矩阵，终端输出二维数值
+
+func case62() {
+	src := getTestImg()
+	// 提取RGB三通道矩阵
+	matrices, err := ExtractRGBMatrices(src)
+	if err != nil {
+		fmt.Println("错误:", err)
+		return
+	}
+
+	// 打印矩阵
+	PrintMatrix("R通道", matrices.R)
+	PrintMatrix("G通道", matrices.G)
+	PrintMatrix("B通道", matrices.B)
+}
+
+// 配置：终端显示的矩阵尺寸（可根据终端宽度调整）
+const (
+	targetWidth  = 20 // 矩阵宽度（列数）
+	targetHeight = 20 // 矩阵高度（行数）
+)
+
+// RGBMatrices 存储R、G、B三通道的二维矩阵
+type RGBMatrices struct {
+	R [][]uint8 // R通道矩阵：[行][列] = 像素值
+	G [][]uint8 // G通道矩阵
+	B [][]uint8 // B通道矩阵
+}
+
+// ExtractRGBMatrices 提取缩放后的RGB三通道矩阵
+func ExtractRGBMatrices(img image.Image) (RGBMatrices, error) {
+	// 获取原图尺寸
+	bounds := img.Bounds()
+	origWidth := bounds.Max.X - bounds.Min.X
+	origHeight := bounds.Max.Y - bounds.Min.Y
+	if origWidth == 0 || origHeight == 0 {
+		return RGBMatrices{}, fmt.Errorf("图片尺寸无效")
+	}
+
+	// 初始化三通道矩阵（目标尺寸）
+	rMat := make([][]uint8, targetHeight)
+	gMat := make([][]uint8, targetHeight)
+	bMat := make([][]uint8, targetHeight)
+	for i := range rMat {
+		rMat[i] = make([]uint8, targetWidth)
+		gMat[i] = make([]uint8, targetWidth)
+		bMat[i] = make([]uint8, targetWidth)
+	}
+
+	// 计算缩放步长（原图到目标尺寸的采样间隔）
+	stepX := float64(origWidth) / float64(targetWidth)
+	stepY := float64(origHeight) / float64(targetHeight)
+
+	// 遍历目标矩阵的每个位置，采样原图像素
+	for ty := 0; ty < targetHeight; ty++ {
+		for tx := 0; tx < targetWidth; tx++ {
+			// 计算原图中对应的采样坐标（取整）
+			origX := int(float64(tx)*stepX) + bounds.Min.X
+			origY := int(float64(ty)*stepY) + bounds.Min.Y
+
+			// 确保坐标在原图范围内（避免越界）
+			if origX >= bounds.Max.X {
+				origX = bounds.Max.X - 1
+			}
+			if origY >= bounds.Max.Y {
+				origY = bounds.Max.Y - 1
+			}
+
+			// 提取像素的RGBA值（转换为0-255）
+			r, g, b, _ := img.At(origX, origY).RGBA()
+			r8 := uint8(r >> 8) // 16位转8位
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 存入矩阵
+			rMat[ty][tx] = r8
+			gMat[ty][tx] = g8
+			bMat[ty][tx] = b8
+		}
+	}
+
+	return RGBMatrices{R: rMat, G: gMat, B: bMat}, nil
+}
+
+// PrintMatrix 在终端打印二维矩阵
+func PrintMatrix(name string, matrix [][]uint8) {
+	fmt.Printf("\n===== %s 矩阵（%dx%d） =====\n", name, len(matrix), len(matrix[0]))
+	for _, row := range matrix {
+		for _, val := range row {
+			fmt.Printf("%3d ", val) // 占3位宽度，右对齐，确保列对齐
+		}
+		fmt.Println() // 每行结束换行
+	}
+}
+
+// ========================================================================
+
+// case63 打印图片的灰度矩阵，在终端显示二维数值
+
+func case63() {
+	src := getTestImg()
+	// 提取灰度矩阵
+	grayMatrix, err := ExtractGrayMatrix(src)
+	if err != nil {
+		fmt.Println("错误:", err)
+		return
+	}
+
+	// 打印灰度矩阵
+	PrintGrayMatrix(grayMatrix)
+}
+
+// RGBToGray 将RGB值转换为灰度值（0-255）
+// 公式：gray = 0.299*R + 0.587*G + 0.114*B（人眼感知加权）
+func RGBToGray(r, g, b uint8) uint8 {
+	grayFloat := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+	return uint8(grayFloat)
+}
+
+// ExtractGrayMatrix 提取缩放后的灰度矩阵
+func ExtractGrayMatrix(img image.Image) ([][]uint8, error) {
+	// 获取原图尺寸
+	bounds := img.Bounds()
+	origWidth := bounds.Max.X - bounds.Min.X
+	origHeight := bounds.Max.Y - bounds.Min.Y
+	if origWidth == 0 || origHeight == 0 {
+		return nil, fmt.Errorf("图片尺寸无效")
+	}
+
+	// 初始化灰度矩阵（目标尺寸）
+	grayMatrix := make([][]uint8, targetHeight)
+	for i := range grayMatrix {
+		grayMatrix[i] = make([]uint8, targetWidth)
+	}
+
+	// 计算缩放步长（原图到目标尺寸的采样间隔）
+	stepX := float64(origWidth) / float64(targetWidth)
+	stepY := float64(origHeight) / float64(targetHeight)
+
+	// 遍历目标矩阵的每个位置，采样并转换为灰度值
+	for ty := 0; ty < targetHeight; ty++ {
+		for tx := 0; tx < targetWidth; tx++ {
+			// 计算原图中对应的采样坐标（取整）
+			origX := int(float64(tx)*stepX) + bounds.Min.X
+			origY := int(float64(ty)*stepY) + bounds.Min.Y
+
+			// 确保坐标在原图范围内（避免越界）
+			if origX >= bounds.Max.X {
+				origX = bounds.Max.X - 1
+			}
+			if origY >= bounds.Max.Y {
+				origY = bounds.Max.Y - 1
+			}
+
+			// 提取像素的RGBA值（转换为0-255的RGB）
+			r, g, b, _ := img.At(origX, origY).RGBA()
+			r8 := uint8(r >> 8) // 16位转8位（RGBA返回0-65535）
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 转换为灰度值并存入矩阵
+			grayMatrix[ty][tx] = RGBToGray(r8, g8, b8)
+		}
+	}
+
+	return grayMatrix, nil
+}
+
+// PrintGrayMatrix 在终端打印灰度矩阵
+func PrintGrayMatrix(matrix [][]uint8) {
+	fmt.Printf("\n===== 灰度矩阵（%dx%d） =====\n", len(matrix), len(matrix[0]))
+	for _, row := range matrix {
+		for _, val := range row {
+			fmt.Printf("%3d ", val) // 占3位宽度，右对齐，确保列对齐
+		}
+		fmt.Println() // 每行结束换行
+	}
+}
+
+// ========================================================================
+
+// case64 打印图片的二值矩阵，在终端显示二维数值
+
+func case64() {
+	src := getTestImg()
+	// 提取二值矩阵
+	binaryMatrix, err := ExtractBinaryMatrix(src)
+	if err != nil {
+		fmt.Println("错误:", err)
+		return
+	}
+
+	// 打印二值矩阵
+	PrintBinaryMatrix(binaryMatrix)
+}
+
+// 配置：终端显示的二值矩阵尺寸和阈值
+const (
+	threshold = 128 // 二值化阈值（灰度值 >= threshold 为1，否则为0）
+)
+
+// ExtractBinaryMatrix 提取缩放后的二值矩阵
+func ExtractBinaryMatrix(img image.Image) ([][]int, error) {
+	// 获取原图尺寸
+	bounds := img.Bounds()
+	origWidth := bounds.Max.X - bounds.Min.X
+	origHeight := bounds.Max.Y - bounds.Min.Y
+	if origWidth == 0 || origHeight == 0 {
+		return nil, fmt.Errorf("图片尺寸无效")
+	}
+
+	// 初始化二值矩阵（目标尺寸，元素为0或1）
+	binaryMatrix := make([][]int, targetHeight)
+	for i := range binaryMatrix {
+		binaryMatrix[i] = make([]int, targetWidth)
+	}
+
+	// 计算缩放步长（原图到目标尺寸的采样间隔）
+	stepX := float64(origWidth) / float64(targetWidth)
+	stepY := float64(origHeight) / float64(targetHeight)
+
+	// 遍历目标矩阵的每个位置，采样并转换为二值
+	for ty := 0; ty < targetHeight; ty++ {
+		for tx := 0; tx < targetWidth; tx++ {
+			// 计算原图中对应的采样坐标（取整）
+			origX := int(float64(tx)*stepX) + bounds.Min.X
+			origY := int(float64(ty)*stepY) + bounds.Min.Y
+
+			// 确保坐标在原图范围内
+			if origX >= bounds.Max.X {
+				origX = bounds.Max.X - 1
+			}
+			if origY >= bounds.Max.Y {
+				origY = bounds.Max.Y - 1
+			}
+
+			// 提取RGB并转为灰度值
+			r, g, b, _ := img.At(origX, origY).RGBA()
+			gray := RGBToGray(uint8(r>>8), uint8(g>>8), uint8(b>>8))
+
+			// 二值化：灰度 >= 阈值为1，否则为0
+			if gray >= threshold {
+				binaryMatrix[ty][tx] = 1
+			} else {
+				binaryMatrix[ty][tx] = 0
+			}
+		}
+	}
+
+	return binaryMatrix, nil
+}
+
+// PrintBinaryMatrix 在终端打印二值矩阵
+func PrintBinaryMatrix(matrix [][]int) {
+	fmt.Printf("\n===== 二值矩阵（阈值=%d，%dx%d） =====\n", threshold, len(matrix), len(matrix[0]))
+	for _, row := range matrix {
+		for _, val := range row {
+			fmt.Printf("%2d ", val) // 占2位宽度，确保列对齐
+		}
+		fmt.Println() // 每行结束换行
+	}
+}
+
+// ========================================================================
+
+// case65  图像的线性变换
+
+// 线性变换公式：核心公式newVal = a×oldVal + b中：
+//a控制对比度：a > 1增强对比度（明暗差异变大），0 < a < 1降低对比度（明暗差异变小），a < 0反转颜色（亮变暗、暗变亮）。
+//b控制亮度：b > 0整体变亮，b < 0整体变暗（例如b=50会让每个像素值增加 50）。
+
+// 示例效果
+//增强对比度 + 增亮：a=1.5, b=20 → 图片明暗差异更明显，整体更亮。
+//降低对比度 + 变暗：a=0.5, b=-30 → 色彩更柔和，整体偏暗。
+//颜色反转：a=-1, b=255 → 公式变为newVal = 255 - oldVal，实现负片效果。
+
+//扩展场景
+//图像预处理：调整亮度 / 对比度以提升后续识别（如 OCR、目标检测）的准确性。
+//风格化：通过反转颜色（a=-1）生成负片效果，或通过低对比度（a=0.2）生成朦胧感。
+//批量处理：结合文件遍历，对文件夹内所有图片应用统一变换（如批量提亮暗图）。
+
+func case65() {
+	src := getTest2Img()
+	a := 1.5  // 0.5   // 缩放系数（增强对比度）
+	b := 20.0 // -30.0 // 偏移量（增加亮度）
+	// 应用线性变换
+	transformedImg := LinearTransform(src, a, b)
+	outputFileName := "output_case65.jpg"
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+	err = jpeg.Encode(outputFile, transformedImg, &jpeg.Options{Quality: 90})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// LinearTransform 对图片应用线性变换：newVal = a*oldVal + b
+// 参数：
+//
+//	img: 输入图片
+//	a: 缩放系数（控制对比度，a>1增强，0<a<1减弱，a<0反转）
+//	b: 偏移量（控制亮度，b>0变亮，b<0变暗）
+//
+// 返回：处理后的图片
+func LinearTransform(img image.Image, a, b float64) image.Image {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 创建输出图片（RGBA格式，支持透明通道）
+	outImg := image.NewRGBA(bounds)
+
+	// 遍历每个像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取原像素的RGBA值（范围0-65535）
+			r, g, bVal, aVal := img.At(x, y).RGBA()
+
+			// 转换为0-255范围（右移8位）
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(bVal >> 8)
+
+			// 对R、G、B通道应用线性变换，并截断到0-255
+			newR := clampLinear(float64(r8), a, b)
+			newG := clampLinear(float64(g8), a, b)
+			newB := clampLinear(float64(b8), a, b)
+
+			// 写入新像素（Alpha通道保持不变，转回0-65535）
+			outImg.SetRGBA(
+				x, y,
+				color.RGBA{
+					R: newR,
+					G: newG,
+					B: newB,
+					A: uint8(aVal >> 8), // 保留原透明度
+				},
+			)
+		}
+	}
+
+	return outImg
+}
+
+// clampLinear 应用线性变换并截断到0-255
+func clampLinear(val, a, b float64) uint8 {
+	result := a*val + b
+	// 确保结果在0-255范围内（防止溢出）
+	if result < 0 {
+		return 0
+	}
+	if result > 255 {
+		return 255
+	}
+	return uint8(result)
+}
+
+// ========================================================================
+
+// case66 图像细化
+
+// 图像细化（Image Thinning）是将二值图像中的线条或区域缩减为单像素宽度骨架的过程，
+//核心是保留图像拓扑结构（如连接性、分支）的同时去除冗余像素，广泛用于指纹识别、文字识别、轮廓分析等场景。
+//常用的细化算法中，Zhang-Suen 算法因实现简单、效果稳定被广泛采用
+
+func case66() {
+	src := getTestImg()
+	// 2. 针对文字的精准二值化
+	bin := BinarizeForText(src)
+	fmt.Println("二值化完成")
+
+	// 3. 应用Zhang-Suen细化
+	thinned := ZhangSuenThinningForText(bin)
+	fmt.Println("细化完成")
+	outputPath := "output_case66.png"
+	// 4. 保存结果
+	if err := SaveThinned(thinned, outputPath); err != nil {
+		fmt.Printf("保存图片失败: %v\n", err)
+		return
+	}
+	fmt.Printf("细化结果已保存到 %s\n", outputPath)
+}
+
+// 【优化1：针对文字的二值化阈值】
+// 黑色文字在浅色背景上，将阈值调低至50，确保文字完全转为前景
+const textThreshold = 50
+
+// 8邻域索引（顺时针：p2-p9，对应坐标偏移）
+var neighbors = []image.Point{
+	{0, -1},  // p2: (x, y-1)
+	{1, -1},  // p3: (x+1, y-1)
+	{1, 0},   // p4: (x+1, y)
+	{1, 1},   // p5: (x+1, y+1)
+	{0, 1},   // p6: (x, y+1)
+	{-1, 1},  // p7: (x-1, y+1)
+	{-1, 0},  // p8: (x-1, y)
+	{-1, -1}, // p9: (x-1, y-1)
+}
+
+// ReadImage 读取图片
+func ReadImage(path string) (image.Image, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("打开文件失败: %w", err)
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	return img, err
+}
+
+// 【优化2：精准二值化】
+// 针对黑色文字+浅色背景，强制将文字转为前景（255），背景转为0
+func BinarizeForText(img image.Image) [][]uint8 {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	bin := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		bin[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			// 转为灰度后，低于阈值的文字像素设为255，否则为0
+			r, g, b, _ := img.At(x, y).RGBA()
+			gray := uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+			if gray <= textThreshold {
+				bin[y][x] = 255 // 文字（前景）
+			} else {
+				bin[y][x] = 0 // 背景
+			}
+		}
+	}
+	return bin
+}
+
+// countForeground 计算8邻域中前景像素（255）的数量
+func countForeground(bin [][]uint8, x, y int) int {
+	count := 0
+	height, width := len(bin), len(bin[0])
+	for _, n := range neighbors {
+		nx, ny := x+n.X, y+n.Y
+		// 边界外视为背景
+		if nx >= 0 && nx < width && ny >= 0 && ny < height && bin[ny][nx] == 255 {
+			count++
+		}
+	}
+	return count
+}
+
+// countConnections 计算8邻域的连接数（衡量像素的"拐角"程度）
+func countConnections(bin [][]uint8, x, y int) int {
+	height, width := len(bin), len(bin[0])
+	// 取p2-p9的二值（1=前景，0=背景）
+	p := make([]int, 8)
+	for i, n := range neighbors {
+		nx, ny := x+n.X, y+n.Y
+		if nx >= 0 && nx < width && ny >= 0 && ny < height && bin[ny][nx] == 255 {
+			p[i] = 1
+		}
+	}
+	// 连接数=相邻像素从0→1的次数（p9与p2相邻）
+	count := 0
+	for i := 0; i < 8; i++ {
+		j := (i + 1) % 8
+		if p[i] == 0 && p[j] == 1 {
+			count++
+		}
+	}
+	return count
+}
+
+// 【优化3：增加端点保护】
+// 文字的端点（N(p1)=1）不应被删除，避免笔画断裂
+func ZhangSuenThinningForText(bin [][]uint8) [][]uint8 {
+	height, width := len(bin), len(bin[0])
+	// 复制原图避免修改输入
+	thinned := make([][]uint8, height)
+	for y := range bin {
+		thinned[y] = make([]uint8, width)
+		copy(thinned[y], bin[y])
+	}
+
+	for {
+		deleted := false // 标记本轮是否删除像素
+		// 第一步迭代：标记符合条件的像素
+		toDelete1 := make([][]bool, height)
+		for y := 0; y < height; y++ {
+			toDelete1[y] = make([]bool, width)
+			for x := 0; x < width; x++ {
+				if thinned[y][x] != 255 {
+					continue // 跳过背景
+				}
+				n := countForeground(thinned, x, y)
+				c := countConnections(thinned, x, y)
+				// 【新增】端点保护：N(p1)=1时不删除
+				if n == 1 {
+					continue
+				}
+				// 原条件：2 ≤ N(p1) ≤ 6 且 C(p1)=1
+				if n < 2 || n > 6 || c != 1 {
+					continue
+				}
+				// 条件4-5：p2*p4*p6=0 且 p4*p6*p8=0
+				p2 := getNeighbor(thinned, x, y, 0)
+				p4 := getNeighbor(thinned, x, y, 2)
+				p6 := getNeighbor(thinned, x, y, 4)
+				p8 := getNeighbor(thinned, x, y, 6)
+				if p2*p4*p6 == 0 && p4*p6*p8 == 0 {
+					toDelete1[y][x] = true
+					deleted = true
+				}
+			}
+		}
+		// 执行第一步删除
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				if toDelete1[y][x] {
+					thinned[y][x] = 0
+				}
+			}
+		}
+
+		// 第二步迭代：标记符合条件的像素
+		toDelete2 := make([][]bool, height)
+		for y := 0; y < height; y++ {
+			toDelete2[y] = make([]bool, width)
+			for x := 0; x < width; x++ {
+				if thinned[y][x] != 255 {
+					continue // 跳过背景
+				}
+				n := countForeground(thinned, x, y)
+				c := countConnections(thinned, x, y)
+				// 【新增】端点保护：N(p1)=1时不删除
+				if n == 1 {
+					continue
+				}
+				// 原条件：2 ≤ N(p1) ≤ 6 且 C(p1)=1
+				if n < 2 || n > 6 || c != 1 {
+					continue
+				}
+				// 条件4-5：p2*p4*p8=0 且 p2*p6*p8=0
+				p2 := getNeighbor(thinned, x, y, 0)
+				p4 := getNeighbor(thinned, x, y, 2)
+				p6 := getNeighbor(thinned, x, y, 4)
+				p8 := getNeighbor(thinned, x, y, 6)
+				if p2*p4*p8 == 0 && p2*p6*p8 == 0 {
+					toDelete2[y][x] = true
+					deleted = true
+				}
+			}
+		}
+		// 执行第二步删除
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				if toDelete2[y][x] {
+					thinned[y][x] = 0
+				}
+			}
+		}
+
+		// 若本轮无删除，终止迭代
+		if !deleted {
+			break
+		}
+	}
+
+	return thinned
+}
+
+// getNeighbor 获取指定邻域像素的二值（1=前景，0=背景）
+func getNeighbor(bin [][]uint8, x, y, idx int) int {
+	n := neighbors[idx]
+	nx, ny := x+n.X, y+n.Y
+	height, width := len(bin), len(bin[0])
+	if nx >= 0 && nx < width && ny >= 0 && ny < height && bin[ny][nx] == 255 {
+		return 1
+	}
+	return 0
+}
+
+// SaveThinned 保存细化后的图像
+func SaveThinned(thinned [][]uint8, path string) error {
+	height, width := len(thinned), len(thinned[0])
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			val := thinned[y][x]
+			img.SetRGBA(x, y, color.RGBA{val, val, val, 255}) // 灰度图（骨架为白）
+		}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, img)
+}
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
 // todo gif相关  图片格式转换
 // todo 加水印，文字水印，图片水印  多种效果
