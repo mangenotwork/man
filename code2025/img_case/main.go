@@ -1,6 +1,8 @@
 package main
 
 import (
+	"container/heap"
+	"container/list"
 	"fmt"
 	"golang.org/x/image/draw"
 	"image"
@@ -94,7 +96,7 @@ func main() {
 
 	// case40()
 
-	case41()
+	// case41()
 
 	// case42()
 
@@ -144,7 +146,25 @@ func main() {
 
 	// case65()
 
-	case66()
+	// case66()
+
+	// case68()
+
+	// case69()
+
+	// case70()
+
+	// case71()
+
+	// case72()
+
+	// case73()
+
+	// case74()
+
+	// case75()
+
+	case76()
 }
 
 func getTestImg() image.Image {
@@ -5163,17 +5183,6 @@ var neighbors = []image.Point{
 	{-1, -1}, // p9: (x-1, y-1)
 }
 
-// ReadImage 读取图片
-func ReadImage(path string) (image.Image, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %w", err)
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
-	return img, err
-}
-
 // 【优化2：精准二值化】
 // 针对黑色文字+浅色背景，强制将文字转为前景（255），背景转为0
 func BinarizeForText(img image.Image) [][]uint8 {
@@ -5358,6 +5367,1692 @@ func SaveThinned(thinned [][]uint8, path string) error {
 	defer f.Close()
 	return png.Encode(f, img)
 }
+
+// ========================================================================
+
+// case67 图片的孔洞填充
+// 适用场景：适用于印刷文字修复（填补文字内部的孔洞）、工业缺陷检测（识别封闭区域的孔洞）、图像分割后处理等场景。
+
+func case67() {
+	src := getTestImg()
+	// 2. 二值化
+	bin, err := Binarize(src)
+	if err != nil {
+		fmt.Printf("二值化失败: %v\n", err)
+		return
+	}
+
+	// 3. 识别孔洞
+	holes := FindHoles(bin)
+	fmt.Printf("识别到 %d 个孔洞\n", len(holes))
+
+	// 4. 填充孔洞
+	FillHoles(bin, holes)
+	outputPath := "output_case67.png"
+	// 5. 保存结果
+	if err := SaveImage(bin, outputPath); err != nil {
+		fmt.Printf("保存图片失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("孔洞填充完成，结果已保存到 %s\n", outputPath)
+}
+
+// SaveImage 保存处理后的图像
+func SaveImage(bin [][]uint8, path string) error {
+	height, width := len(bin), len(bin[0])
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			val := bin[y][x]
+			img.SetRGBA(x, y, color.RGBA{val, val, val, 255})
+		}
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return png.Encode(file, img)
+}
+
+const (
+	Background = 0   // 背景像素值
+	Foreground = 255 // 前景像素值
+	Threshold  = 128 // 二值化阈值（可根据图片调整）
+)
+
+// 四连通方向（上下左右），若需八连通可添加对角线方向
+var dirs = []image.Point{{0, 1}, {0, -1}, {1, 0}, {-1, 0}}
+
+// Binarize 二值化图像，返回二维像素数组
+func Binarize(img image.Image) ([][]uint8, error) {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	bin := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		bin[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			gray := uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+			if gray < Threshold {
+				bin[y][x] = Foreground // 深色区域设为前景
+			} else {
+				bin[y][x] = Background // 浅色区域设为背景
+			}
+		}
+	}
+	return bin, nil
+}
+
+// HoleRegion 表示一个孔洞区域的所有像素坐标
+type HoleRegion struct {
+	pixels      []image.Point // 孔洞内所有像素的坐标
+	touchesEdge bool          // 是否接触图像边缘（true则不是孔洞）
+}
+
+// FindHoles 识别所有孔洞区域
+func FindHoles(bin [][]uint8) []HoleRegion {
+	height, width := len(bin), len(bin[0])
+	visited := make([][]bool, height)
+	for y := range visited {
+		visited[y] = make([]bool, width)
+	}
+	var holes []HoleRegion
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if bin[y][x] == Background && !visited[y][x] {
+				// BFS遍历当前背景连通域
+				queue := list.New()
+				queue.PushBack(image.Point{x, y})
+				visited[y][x] = true
+				var region []image.Point
+				touchesEdge := false
+
+				for queue.Len() > 0 {
+					p := queue.Remove(queue.Front()).(image.Point)
+					region = append(region, p)
+
+					// 检查是否接触图像边缘
+					if p.X == 0 || p.X == width-1 || p.Y == 0 || p.Y == height-1 {
+						touchesEdge = true
+					}
+
+					// 遍历四连通邻居
+					for _, d := range dirs {
+						nx, ny := p.X+d.X, p.Y+d.Y
+						if nx >= 0 && nx < width && ny >= 0 && ny < height && bin[ny][nx] == Background && !visited[ny][nx] {
+							visited[ny][nx] = true
+							queue.PushBack(image.Point{nx, ny})
+						}
+					}
+				}
+
+				// 仅保留不接触边缘的背景连通域（即孔洞）
+				if !touchesEdge {
+					holes = append(holes, HoleRegion{pixels: region, touchesEdge: touchesEdge})
+				}
+			}
+		}
+	}
+
+	return holes
+}
+
+// FillHoles 填充孔洞区域
+func FillHoles(bin [][]uint8, holes []HoleRegion) {
+	for _, hole := range holes {
+		for _, p := range hole.pixels {
+			bin[p.Y][p.X] = Foreground
+		}
+	}
+}
+
+// ========================================================================
+
+// case68 图像的小波阈值去噪
+
+// 算法原理
+//小波阈值去噪的核心是利用小波变换将图像分解为低频近似分量（保留图像主要结构）和高频细节分量（包含噪声和边缘），
+//然后对高频分量应用阈值函数（收缩噪声系数），最后通过逆变换重构去噪后的图像。
+
+func case68() {
+	src := "./test2.jpg"
+
+	// 1. 读取带噪声的图像
+	noisyMatrix, err := ReadImageToMatrix(src)
+	if err != nil {
+		fmt.Printf("读取图像失败: %v\n", err)
+		return
+	}
+
+	// 2. 小波分解
+	low, highX, highY, highXY := HaarWaveletDecompose(noisyMatrix)
+
+	// 3. 估计噪声水平
+	noiseLevel := EstimateNoiseLevel(highX, highY, highXY)
+	fmt.Printf("估计噪声水平: %.2f\n", noiseLevel)
+
+	// 4. 高频系数阈值处理
+	WaveletThresholding(highX, highY, highXY, noiseLevel)
+
+	// 5. 小波重构
+	denoisedMatrix := HaarWaveletReconstruct(low, highX, highY, highXY)
+
+	outputPath := "output_case68.png"
+
+	// 6. 保存去噪结果
+	if err := SaveImage(denoisedMatrix, outputPath); err != nil {
+		fmt.Printf("保存图像失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("小波阈值去噪完成，结果已保存到 %s\n", outputPath)
+}
+
+const (
+	ThresholdRatio = 0.5 // 阈值系数（可根据噪声强度调整，范围0.0~0.5）
+)
+
+// 二维图像的像素矩阵（灰度值0-255）
+type ImageMatrix [][]uint8
+
+// ReadImage 读取图片并转为灰度矩阵
+func ReadImageToMatrix(path string) (ImageMatrix, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("打开文件失败: %w", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return nil, fmt.Errorf("解码图片失败: %w", err)
+	}
+
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	matrix := make(ImageMatrix, height)
+	for y := 0; y < height; y++ {
+		matrix[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			gray := uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+			matrix[y][x] = gray
+		}
+	}
+	return matrix, nil
+}
+
+// HaarWaveletDecompose 对图像进行Haar小波分解（一级）
+func HaarWaveletDecompose(matrix ImageMatrix) (low, highX, highY, highXY ImageMatrix) {
+	height, width := len(matrix), len(matrix[0])
+	// 确保尺寸为偶数（Haar小波分解要求长度为2的倍数）
+	if height%2 != 0 {
+		height--
+	}
+	if width%2 != 0 {
+		width--
+	}
+
+	// 初始化四个子带（低频、水平高频、垂直高频、对角高频）
+	low = make(ImageMatrix, height/2)
+	highX = make(ImageMatrix, height/2)
+	highY = make(ImageMatrix, height/2)
+	highXY = make(ImageMatrix, height/2)
+	for y := 0; y < height/2; y++ {
+		low[y] = make([]uint8, width/2)
+		highX[y] = make([]uint8, width/2)
+		highY[y] = make([]uint8, width/2)
+		highXY[y] = make([]uint8, width/2)
+	}
+
+	// 对每一行进行一维Haar分解
+	for y := 0; y < height; y += 2 {
+		for x := 0; x < width; x += 2 {
+			// 提取2x2块的四个像素
+			a := float64(matrix[y][x])
+			b := float64(matrix[y][x+1])
+			c := float64(matrix[y+1][x])
+			d := float64(matrix[y+1][x+1])
+
+			// 计算低频和高频系数
+			avg := (a + b + c + d) / 4.0
+			hl := (a + b - c - d) / 4.0
+			lh := (a - b + c - d) / 4.0
+			hh := (a - b - c + d) / 4.0
+
+			// 存入子带（注意坐标映射）
+			lowY := y / 2
+			lowX := x / 2
+			low[lowY][lowX] = uint8(math.Round(avg))
+			highX[lowY][lowX] = uint8(math.Round(hl))
+			highY[lowY][lowX] = uint8(math.Round(lh))
+			highXY[lowY][lowX] = uint8(math.Round(hh))
+		}
+	}
+	return
+}
+
+// HaarWaveletReconstruct 小波逆变换（重构图像）
+func HaarWaveletReconstruct(low, highX, highY, highXY ImageMatrix) ImageMatrix {
+	lowHeight, lowWidth := len(low), len(low[0])
+	height, width := lowHeight*2, lowWidth*2
+
+	matrix := make(ImageMatrix, height)
+	for y := 0; y < height; y++ {
+		matrix[y] = make([]uint8, width)
+	}
+
+	// 对每个2x2块进行逆变换
+	for y := 0; y < lowHeight; y++ {
+		for x := 0; x < lowWidth; x++ {
+			avg := float64(low[y][x])
+			hl := float64(highX[y][x])
+			lh := float64(highY[y][x])
+			hh := float64(highXY[y][x])
+
+			// 逆变换公式
+			a := avg + hl + lh + hh
+			b := avg + hl - lh - hh
+			c := avg - hl + lh - hh
+			d := avg - hl - lh + hh
+
+			// 映射回原坐标并裁剪到0-255
+			matrix[2*y][2*x] = clamp(a)
+			matrix[2*y][2*x+1] = clamp(b)
+			matrix[2*y+1][2*x] = clamp(c)
+			matrix[2*y+1][2*x+1] = clamp(d)
+		}
+	}
+	return matrix
+}
+
+// clamp 将数值裁剪到0-255范围
+func clamp(val float64) uint8 {
+	if val < 0 {
+		return 0
+	}
+	if val > 255 {
+		return 255
+	}
+	return uint8(val)
+}
+
+// WaveletThresholding 对高频系数应用软阈值
+func WaveletThresholding(highX, highY, highXY ImageMatrix, noiseLevel float64) {
+	height, width := len(highX), len(highX[0])
+	threshold := noiseLevel * ThresholdRatio
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 软阈值：|x| < T → 0；|x| ≥ T → x - sign(x)*T
+			processCoeff := func(coeff *uint8) {
+				val := float64(*coeff)
+				if math.Abs(val) < threshold {
+					*coeff = 0
+				} else {
+					*coeff = uint8(math.Round(val - math.Copysign(threshold, val)))
+				}
+			}
+
+			processCoeff(&highX[y][x])
+			processCoeff(&highY[y][x])
+			processCoeff(&highXY[y][x])
+		}
+	}
+}
+
+// EstimateNoiseLevel 估计噪声水平（基于高频系数的标准差）
+func EstimateNoiseLevel(highX, highY, highXY ImageMatrix) float64 {
+	var sum float64
+	count := 0
+	height, width := len(highX), len(highX[0])
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			sum += math.Pow(float64(highX[y][x]), 2)
+			sum += math.Pow(float64(highY[y][x]), 2)
+			sum += math.Pow(float64(highXY[y][x]), 2)
+			count += 3
+		}
+	}
+
+	if count == 0 {
+		return 0
+	}
+	variance := sum / float64(count)
+	return math.Sqrt(variance)
+}
+
+// ========================================================================
+
+// case69 Sobel算子边缘检测
+
+// 算法原理
+//Sobel 算子通过两个 3×3 卷积核（分别检测水平梯度和垂直梯度），计算每个像素的梯度幅值，从而识别图像边缘：
+//水平梯度核（Gₓ）：[[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+//垂直梯度核（Gᵧ）：[[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+//梯度幅值：|Gₓ| + |Gᵧ|（或√(Gₓ² + Gᵧ²)，前者更高效）
+//阈值处理：梯度幅值超过阈值的像素视为边缘（设为 255），否则为背景（0）。
+
+func case69() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	// 执行Sobel边缘检测
+	edges := SobelEdgeDetection(gray, threshold)
+
+	// 保存结果
+	outputPath := "output_case69.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// 转为灰度矩阵
+func ToGrayMatrix(img image.Image) [][]uint8 {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	gray := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		gray[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			// 加权平均转为灰度（人眼对绿色敏感更高）
+			grayVal := uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+			gray[y][x] = grayVal
+		}
+	}
+	return gray
+}
+
+// Sobel边缘检测（返回二值边缘图，255为边缘，0为背景）
+func SobelEdgeDetection(gray [][]uint8, threshold uint8) [][]uint8 {
+	height := len(gray)
+	if height == 0 {
+		return nil
+	}
+	width := len(gray[0])
+	edges := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]uint8, width)
+	}
+
+	// 遍历所有非边界像素（确保3×3邻域有效）
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			// 计算水平梯度Gx
+			gx := -int(gray[y-1][x-1]) - 2*int(gray[y][x-1]) - int(gray[y+1][x-1]) +
+				int(gray[y-1][x+1]) + 2*int(gray[y][x+1]) + int(gray[y+1][x+1])
+
+			// 计算垂直梯度Gy
+			gy := -int(gray[y-1][x-1]) - 2*int(gray[y-1][x]) - int(gray[y-1][x+1]) +
+				int(gray[y+1][x-1]) + 2*int(gray[y+1][x]) + int(gray[y+1][x+1])
+
+			// 梯度幅值（L1范数，|Gx| + |Gy|，高效且效果接近L2）
+			magnitude := math.Abs(float64(gx)) + math.Abs(float64(gy))
+
+			// 阈值处理
+			if magnitude >= float64(threshold) {
+				edges[y][x] = 255
+			} else {
+				edges[y][x] = 0
+			}
+		}
+	}
+
+	return edges
+}
+
+// ========================================================================
+
+// case70 Roberts算子边缘检测
+
+// 算法原理
+//Roberts 算子通过两个 2×2 卷积核检测梯度：
+//水平梯度核（Gₓ）：[[1, 0], [0, -1]]
+//垂直梯度核（Gᵧ）：[[0, 1], [-1, 0]]
+//梯度幅值：|Gₓ| + |Gᵧ|（或√(Gₓ² + Gᵧ²)，前者更高效）
+//阈值处理：梯度幅值超过阈值的像素视为边缘（设为 255），否则为背景（0）。
+
+func case70() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	edges := RobertsEdgeDetection(gray, threshold)
+
+	// 保存结果
+	outputPath := "output_case70.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// Roberts边缘检测（返回二值边缘图，255为边缘，0为背景）
+func RobertsEdgeDetection(gray [][]uint8, threshold uint8) [][]uint8 {
+	height := len(gray)
+	if height < 2 {
+		return nil
+	}
+	width := len(gray[0])
+	if width < 2 {
+		return nil
+	}
+
+	edges := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]uint8, width)
+	}
+
+	// 遍历所有非边界像素（确保2×2邻域有效）
+	for y := 0; y < height-1; y++ {
+		for x := 0; x < width-1; x++ {
+			// 计算水平梯度Gx = gray[y][x] - gray[y+1][x+1]
+			gx := int(gray[y][x]) - int(gray[y+1][x+1])
+			// 计算垂直梯度Gy = gray[y][x+1] - gray[y+1][x]
+			gy := int(gray[y][x+1]) - int(gray[y+1][x])
+
+			// 梯度幅值（L1范数，|Gx| + |Gy|）
+			magnitude := math.Abs(float64(gx)) + math.Abs(float64(gy))
+
+			// 阈值处理
+			if magnitude >= float64(threshold) {
+				edges[y][x] = 255
+			} else {
+				edges[y][x] = 0
+			}
+		}
+	}
+
+	return edges
+}
+
+// ========================================================================
+
+// case71 Prewitt算子边缘检测
+
+// 算法原理
+//Prewitt 算子通过两个 3×3 卷积核分别计算水平和垂直方向的梯度：
+//水平梯度核（Gₓ）：检测垂直边缘（左右变化）
+//[[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]
+//垂直梯度核（Gᵧ）：检测水平边缘（上下变化）
+//[[-1, -1, -1], [0, 0, 0], [1, 1, 1]]
+
+func case71() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	edges := PrewittEdgeDetection(gray, threshold)
+
+	// 保存结果
+	outputPath := "output_case71.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// PrewittEdgeDetection 应用Prewitt算子检测边缘
+// 参数：gray为灰度矩阵，threshold为边缘阈值（0-255）
+// 返回：二值边缘矩阵（255为边缘，0为背景）
+func PrewittEdgeDetection(gray [][]uint8, threshold uint8) [][]uint8 {
+	height := len(gray)
+	if height < 3 { // 至少3行才能应用3x3核
+		return nil
+	}
+	width := len(gray[0])
+	if width < 3 { // 至少3列
+		return nil
+	}
+
+	edges := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]uint8, width)
+	}
+
+	// 遍历所有非边界像素（确保3x3邻域有效）
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			// 计算水平梯度Gx（垂直边缘）
+			gx := -int(gray[y-1][x-1]) + int(gray[y-1][x+1]) +
+				-int(gray[y][x-1]) + int(gray[y][x+1]) +
+				-int(gray[y+1][x-1]) + int(gray[y+1][x+1])
+
+			// 计算垂直梯度Gy（水平边缘）
+			gy := -int(gray[y-1][x-1]) - int(gray[y-1][x]) - int(gray[y-1][x+1]) +
+				int(gray[y+1][x-1]) + int(gray[y+1][x]) + int(gray[y+1][x+1])
+
+			// 梯度幅值（用L1范数，计算高效；L2范数为math.Sqrt(float64(gx*gx + gy*gy))）
+			magnitude := math.Abs(float64(gx)) + math.Abs(float64(gy))
+
+			// 阈值判断：超过阈值则为边缘
+			if magnitude >= float64(threshold) {
+				edges[y][x] = 255
+			} else {
+				edges[y][x] = 0
+			}
+		}
+	}
+
+	return edges
+}
+
+// ========================================================================
+
+// case72 Laplacian算子边缘检测
+
+// 算法原理
+//Laplacian 算子通过计算图像的二阶导数来识别边缘，核心是 3×3 卷积核（常用形式）：
+//标准核 1（4 邻域）：[[0, 1, 0], [1, -4, 1], [0, 1, 0]]
+//标准核 2（8 邻域）：[[1, 1, 1], [1, -8, 1], [1, 1, 1]]
+
+func case72() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	edges := LaplacianEdgeDetection(gray, threshold)
+
+	// 保存结果
+	outputPath := "output_case72.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// 选择Laplacian卷积核（8邻域核，对边缘更敏感）
+var laplacianKernelSZ = [3][3]int{
+	{1, 1, 1},
+	{1, -8, 1},
+	{1, 1, 1},
+}
+
+// LaplacianEdgeDetection 应用Laplacian算子检测边缘
+func LaplacianEdgeDetection(gray [][]uint8, threshold uint8) [][]uint8 {
+	height := len(gray)
+	if height < 3 {
+		return nil
+	}
+	width := len(gray[0])
+	if width < 3 {
+		return nil
+	}
+
+	edges := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]uint8, width)
+	}
+
+	// 遍历非边界像素（确保3×3邻域有效）
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			// 与Laplacian核卷积计算二阶导数响应
+			var response int
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					// 核索引映射：kernel[ky+1][kx+1] 对应核的位置
+					response += int(gray[y+ky][x+kx]) * laplacianKernelSZ[ky+1][kx+1]
+				}
+			}
+
+			// 取绝对值作为边缘强度
+			strength := math.Abs(float64(response))
+
+			// 阈值处理
+			if strength >= float64(threshold) {
+				edges[y][x] = 255
+			} else {
+				edges[y][x] = 0
+			}
+		}
+	}
+
+	return edges
+}
+
+// ========================================================================
+
+// case73 LoG算子边缘检测
+
+// 算法原理
+//LoG 算子的核心是 “先平滑，再求二阶导数”：
+//高斯滤波：用高斯核卷积图像，抑制噪声（高斯函数的标准差 σ 控制平滑程度，σ 越大平滑越强）。
+//Laplacian 变换：对平滑后的图像应用 Laplacian 算子，检测灰度的快速变化（边缘）。
+//零交叉检测：LoG 响应值穿过零的位置即为边缘（实际实现中常用阈值简化：响应绝对值超过阈值的区域视为边缘）。
+
+func case73() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	edges := LoGEdgeDetection(gray)
+
+	// 保存结果
+	outputPath := "output_case73.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// 配置参数
+const (
+	sigma73      = 1.0 // 高斯核标准差（控制平滑程度，建议0.5-2.0）
+	kernelSize73 = 5   // 高斯核尺寸（需为奇数，3/5/7，与sigma匹配）
+	threshold73  = 30  // 边缘检测阈值（建议20-50）
+)
+
+// GenerateGaussianKernel 生成高斯核（归一化）
+func GenerateGaussianKernel(sigma float64, size int) [][]float64 {
+	kernel := make([][]float64, size)
+	center := size / 2
+	var sum float64 // 用于归一化
+
+	// 计算高斯核值
+	for y := 0; y < size; y++ {
+		kernel[y] = make([]float64, size)
+		for x := 0; x < size; x++ {
+			// 高斯函数：G(x,y) = (1/(2πσ²)) * e^(-(x²+y²)/(2σ²))
+			dx := float64(x - center)
+			dy := float64(y - center)
+			expTerm := math.Exp(-(dx*dx + dy*dy) / (2 * sigma * sigma))
+			kernel[y][x] = expTerm / (2 * math.Pi * sigma * sigma)
+			sum += kernel[y][x]
+		}
+	}
+
+	// 归一化（确保核的总和为1，避免图像亮度变化）
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			kernel[y][x] /= sum
+		}
+	}
+
+	return kernel
+}
+
+// GaussianBlur 高斯滤波（卷积操作）
+func GaussianBlur(gray [][]uint8, kernel [][]float64) [][]uint8 {
+	height := len(gray)
+	width := len(gray[0])
+	ksize := len(kernel)
+	radius := ksize / 2
+
+	blurred := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		blurred[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			var sum float64
+			// 与高斯核卷积
+			for ky := 0; ky < ksize; ky++ {
+				for kx := 0; kx < ksize; ky++ {
+					// 计算图像坐标（边界外视为0）
+					imgY := y + ky - radius
+					imgX := x + kx - radius
+					if imgY >= 0 && imgY < height && imgX >= 0 && imgX < width {
+						sum += float64(gray[imgY][imgX]) * kernel[ky][kx]
+					}
+				}
+			}
+			// 裁剪到0-255
+			blurred[y][x] = clamp73(sum)
+		}
+	}
+	return blurred
+}
+
+// Laplacian 对图像应用Laplacian算子（8邻域核）
+func Laplacian(img [][]uint8) [][]int {
+	height := len(img)
+	width := len(img[0])
+	laplacianKernel := [3][3]int{ // 8邻域Laplacian核
+		{1, 1, 1},
+		{1, -8, 1},
+		{1, 1, 1},
+	}
+
+	response := make([][]int, height)
+	for y := 0; y < height; y++ {
+		response[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			// 边界像素响应为0
+			if x == 0 || x == width-1 || y == 0 || y == height-1 {
+				response[y][x] = 0
+				continue
+			}
+			// 与Laplacian核卷积
+			var val int
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					val += int(img[y+ky][x+kx]) * laplacianKernel[ky+1][kx+1]
+				}
+			}
+			response[y][x] = val
+		}
+	}
+	return response
+}
+
+// LoGEdgeDetection LoG边缘检测（高斯平滑 + Laplacian + 阈值）
+func LoGEdgeDetection(gray [][]uint8) [][]uint8 {
+	// 1. 生成高斯核并平滑图像
+	gaussianKernel := GenerateGaussianKernel(sigma73, kernelSize73)
+	blurred := GaussianBlur(gray, gaussianKernel)
+
+	// 2. 应用Laplacian算子
+	laplacianResponse := Laplacian(blurred)
+
+	// 3. 阈值处理（取绝对值，超过阈值为边缘）
+	height := len(gray)
+	width := len(gray[0])
+	edges := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			if math.Abs(float64(laplacianResponse[y][x])) >= float64(threshold73) {
+				edges[y][x] = 255
+			} else {
+				edges[y][x] = 0
+			}
+		}
+	}
+
+	return edges
+}
+
+// clamp 裁剪到0-255
+func clamp73(val float64) uint8 {
+	if val < 0 {
+		return 0
+	}
+	if val > 255 {
+		return 255
+	}
+	return uint8(val)
+}
+
+// ========================================================================
+
+// case74 Canny算子边缘检测
+
+// 算法原理
+//Canny 算子分 5 个关键步骤：
+//高斯滤波：用高斯核平滑图像，抑制噪声（σ 控制平滑程度）。
+//梯度计算：用 Sobel 算子计算水平 / 垂直梯度，得到梯度幅值和方向。
+//非极大值抑制：在梯度方向上保留局部最大值，将边缘细化为单像素宽度。
+//双阈值检测：用高 / 低阈值（如high=100，low=50）将像素分为 “强边缘”“弱边缘”“非边缘”。
+//边缘连接：弱边缘若与强边缘相连则保留，否则抑制，形成完整边缘
+
+func case74() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	edges := CannyEdgeDetection(gray)
+
+	// 保存结果
+	outputPath := "output_case74.png"
+	if err := SaveImage(edges, outputPath); err != nil {
+		fmt.Printf("错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Sobel边缘检测完成，结果已保存到 %s\n", outputPath)
+}
+
+// 配置参数（可根据图像调整）
+const (
+	sigma74         = 1.0 // 高斯核标准差（建议0.8-1.2）
+	kernelSize74    = 5   // 高斯核尺寸（奇数，3/5，与sigma匹配）
+	highThreshold74 = 100 // 高阈值（强边缘）
+	lowThreshold74  = 50  // 低阈值（弱边缘，通常为高阈值的1/2）
+)
+
+// 梯度方向量化（0°、45°、90°、135°，单位：弧度）
+const (
+	dir0case74   = 0               // 0°（水平）
+	dir45case74  = math.Pi / 4     // 45°
+	dir90case74  = math.Pi / 2     // 90°（垂直）
+	dir135case74 = 3 * math.Pi / 4 // 135°
+)
+
+// GenerateGaussianKernel 生成高斯核（归一化）
+func GenerateGaussianKernel74(sigma float64, size int) [][]float64 {
+	kernel := make([][]float64, size)
+	center := size / 2
+	var sum float64
+	for y := 0; y < size; y++ {
+		kernel[y] = make([]float64, size)
+		for x := 0; x < size; x++ {
+			dx := float64(x - center)
+			dy := float64(y - center)
+			expTerm := math.Exp(-(dx*dx + dy*dy) / (2 * sigma * sigma))
+			kernel[y][x] = expTerm / (2 * math.Pi * sigma * sigma)
+			sum += kernel[y][x]
+		}
+	}
+	// 归一化
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			kernel[y][x] /= sum
+		}
+	}
+	return kernel
+}
+
+// GaussianBlur 高斯滤波
+func GaussianBlur74(gray [][]uint8, kernel [][]float64) [][]uint8 {
+	height := len(gray)
+	width := len(gray[0])
+	ksize := len(kernel)
+	radius := ksize / 2
+
+	blurred := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		blurred[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			var sum float64
+			for ky := 0; ky < ksize; ky++ {
+				for kx := 0; kx < ksize; kx++ {
+					imgY := y + ky - radius
+					imgX := x + kx - radius
+					if imgY >= 0 && imgY < height && imgX >= 0 && imgX < width {
+						sum += float64(gray[imgY][imgX]) * kernel[ky][kx]
+					}
+				}
+			}
+			blurred[y][x] = clamp74(sum)
+		}
+	}
+	return blurred
+}
+
+// CalculateGradients 计算梯度幅值和方向（用Sobel算子）
+func CalculateGradients(blurred [][]uint8) (magnitude [][]float64, direction [][]float64) {
+	height := len(blurred)
+	width := len(blurred[0])
+	magnitude = make([][]float64, height)
+	direction = make([][]float64, height)
+	for y := 0; y < height; y++ {
+		magnitude[y] = make([]float64, width)
+		direction[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			// 边界像素梯度为0
+			if x == 0 || x == width-1 || y == 0 || y == height-1 {
+				magnitude[y][x] = 0
+				direction[y][x] = 0
+				continue
+			}
+			// Sobel算子计算Gx（水平梯度）和Gy（垂直梯度）
+			gx := -int(blurred[y-1][x-1]) - 2*int(blurred[y][x-1]) - int(blurred[y+1][x-1]) +
+				int(blurred[y-1][x+1]) + 2*int(blurred[y][x+1]) + int(blurred[y+1][x+1])
+
+			gy := -int(blurred[y-1][x-1]) - 2*int(blurred[y-1][x]) - int(blurred[y-1][x+1]) +
+				int(blurred[y+1][x-1]) + 2*int(blurred[y+1][x]) + int(blurred[y+1][x+1])
+
+			// 梯度幅值（L2范数）
+			magnitude[y][x] = math.Hypot(float64(gx), float64(gy))
+			// 梯度方向（弧度，0~π）
+			dir := math.Atan2(float64(gy), float64(gx))
+			if dir < 0 {
+				dir += math.Pi // 统一到0~π范围
+			}
+			direction[y][x] = dir
+		}
+	}
+	return
+}
+
+// NonMaxSuppression 非极大值抑制（细化边缘为单像素）
+func NonMaxSuppression(magnitude, direction [][]float64) [][]float64 {
+	height := len(magnitude)
+	width := len(magnitude[0])
+	suppressed := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		suppressed[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			// 边界像素直接抑制
+			if x == 0 || x == width-1 || y == 0 || y == height-1 {
+				suppressed[y][x] = 0
+				continue
+			}
+
+			dir := direction[y][x]
+			mag := magnitude[y][x]
+			var neighbor1, neighbor2 float64
+
+			// 根据梯度方向确定相邻像素（量化到4个方向）
+			switch {
+			// 0°（水平方向，左右相邻）
+			case (dir >= dir0case74-dir45case74/4 && dir < dir0case74+dir45case74/4) ||
+				(dir >= dir90case74+dir45case74*3/4): // 接近180°合并到0°
+				neighbor1 = magnitude[y][x-1] // 左
+				neighbor2 = magnitude[y][x+1] // 右
+			// 45°（对角线，左上-右下）
+			case dir >= dir45case74-dir45case74/4 && dir < dir45case74+dir45case74/4:
+				neighbor1 = magnitude[y-1][x+1] // 右上
+				neighbor2 = magnitude[y+1][x-1] // 左下
+			// 90°（垂直方向，上下相邻）
+			case dir >= dir90case74-dir45case74/4 && dir < dir90case74+dir45case74/4:
+				neighbor1 = magnitude[y-1][x] // 上
+				neighbor2 = magnitude[y+1][x] // 下
+			// 135°（对角线，左上-右下）
+			case dir >= dir135case74-dir45case74/4 && dir < dir135case74+dir45case74/4:
+				neighbor1 = magnitude[y-1][x-1] // 左上
+				neighbor2 = magnitude[y+1][x+1] // 右下
+			}
+
+			// 仅保留局部最大值
+			if mag >= neighbor1 && mag >= neighbor2 {
+				suppressed[y][x] = mag
+			} else {
+				suppressed[y][x] = 0
+			}
+		}
+	}
+	return suppressed
+}
+
+// DoubleThreshold 双阈值分类（强边缘/弱边缘/非边缘）
+func DoubleThreshold(suppressed [][]float64) (edges [][]int) {
+	height := len(suppressed)
+	width := len(suppressed[0])
+	edges = make([][]int, height)
+	for y := 0; y < height; y++ {
+		edges[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			val := suppressed[y][x]
+			if val >= highThreshold74 {
+				edges[y][x] = 2 // 强边缘
+			} else if val >= lowThreshold74 {
+				edges[y][x] = 1 // 弱边缘
+			} else {
+				edges[y][x] = 0 // 非边缘
+			}
+		}
+	}
+	return
+}
+
+// Hysteresis 边缘连接（弱边缘与强边缘相连则保留）
+func Hysteresis(edges [][]int) [][]uint8 {
+	height := len(edges)
+	width := len(edges[0])
+	result := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		result[y] = make([]uint8, width)
+	}
+
+	// 标记已访问的弱边缘
+	visited := make([][]bool, height)
+	for y := range visited {
+		visited[y] = make([]bool, width)
+	}
+
+	// 8邻域方向
+	dirs := []image.Point{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1},
+		{1, -1}, {1, 0}, {1, 1}}
+
+	// 遍历所有强边缘，用BFS连接弱边缘
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if edges[y][x] == 2 { // 强边缘
+				queue := list.New()
+				queue.PushBack(image.Point{x, y})
+				result[y][x] = 255 // 标记为边缘
+
+				for queue.Len() > 0 {
+					p := queue.Remove(queue.Front()).(image.Point)
+					// 检查8邻域的弱边缘
+					for _, d := range dirs {
+						nx, ny := p.X+d.X, p.Y+d.Y
+						if nx >= 0 && nx < width && ny >= 0 && ny < height {
+							if edges[ny][nx] == 1 && !visited[ny][nx] {
+								visited[ny][nx] = true
+								result[ny][nx] = 255 // 弱边缘连接到强边缘，保留
+								queue.PushBack(image.Point{nx, ny})
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// CannyEdgeDetection Canny算子主函数
+func CannyEdgeDetection(gray [][]uint8) [][]uint8 {
+	// 1. 高斯滤波去噪
+	gaussianKernel := GenerateGaussianKernel74(sigma74, kernelSize74)
+	blurred := GaussianBlur74(gray, gaussianKernel)
+
+	// 2. 计算梯度幅值和方向
+	magnitude, direction := CalculateGradients(blurred)
+
+	// 3. 非极大值抑制
+	suppressed := NonMaxSuppression(magnitude, direction)
+
+	// 4. 双阈值检测
+	thresholded := DoubleThreshold(suppressed)
+
+	// 5. 边缘连接
+	edges := Hysteresis(thresholded)
+
+	return edges
+}
+
+// clamp 裁剪到0-255
+func clamp74(val float64) uint8 {
+	if val < 0 {
+		return 0
+	}
+	if val > 255 {
+		return 255
+	}
+	return uint8(val)
+}
+
+// ========================================================================
+
+// case75 分水岭分割
+
+// 算法原理
+//分水岭分割的核心流程：
+//1. 预处理：去噪（形态学开运算）、二值化，得到前景（目标）和背景的初步分离。
+//2. 前景 / 背景标记：
+//确定 “确定前景”（目标内部，通过腐蚀操作获取）。
+//确定 “确定背景”（背景区域，通过膨胀操作获取）。
+//计算 “未知区域”（前景与背景之间的过渡带）。
+//3. 距离变换：对前景计算距离变换，找到每个目标的 “种子点”（距离变换的局部最大值，即目标中心）。
+//4. 分水岭变换：以种子点为起点，模拟水流淹没过程，不同种子点的水流相遇处形成 “分水岭”（分割线），最终将图像分割为多个区域。
+
+func case75() {
+	src := getTest2Img()
+	gray := ToGrayMatrix(src)
+
+	// 2. 二值化
+	bin := Binarize75(gray)
+
+	// 3. 预处理：开运算（去噪）
+	eroded1 := Erode(bin)
+	opened := Dilate(eroded1) // 开运算 = 腐蚀 + 膨胀
+
+	// 4. 确定前景（进一步腐蚀，确保是目标内部）
+	foreground := Erode(opened)
+
+	// 5. 确定背景（膨胀开运算结果）
+	background := Dilate(opened)
+	background = Dilate(background) // 多次膨胀扩大背景
+
+	// 6. 计算未知区域（背景 - 前景）
+	height, width := len(bin), len(bin[0])
+	unknown := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		unknown[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			if background[y][x] == 255 && foreground[y][x] == 0 {
+				unknown[y][x] = 255 // 未知区域
+			} else {
+				unknown[y][x] = 0
+			}
+		}
+	}
+
+	// 7. 距离变换找种子点
+	dist := DistanceTransform(opened)
+	seeds := MarkSeeds(dist, foreground)
+
+	// 8. 分水岭分割
+	labels := Watershed(gray, seeds, unknown)
+
+	outputPath := "output_case75.png"
+
+	// 9. 可视化并保存结果
+	vis := VisualizeLabels(labels)
+	if err := SaveImage(vis, outputPath); err != nil {
+		fmt.Printf("保存图片错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("分水岭分割完成，结果已保存到 %s\n", outputPath)
+
+}
+
+// 配置参数
+const (
+	threshold76     = 128 // 二值化阈值
+	kernelSize76    = 3   // 形态学操作核大小（3x3）
+	distThreshold76 = 5.0 // 距离变换种子点阈值（控制种子数量）
+)
+
+// 形态学结构元素（3x3矩形核）
+var kernel76 = [3][3]int{
+	{1, 1, 1},
+	{1, 1, 1},
+	{1, 1, 1},
+}
+
+// 图像像素点结构（用于优先队列）
+type Pixel struct {
+	val   int // 灰度值（高度）
+	x, y  int // 坐标
+	label int // 所属区域标记（-1为未标记，0为分水岭）
+}
+
+// 优先队列（最小堆，用于模拟水流从低到高淹没）
+type PriorityQueue []*Pixel
+
+func (pq PriorityQueue) Len() int           { return len(pq) }
+func (pq PriorityQueue) Less(i, j int) bool { return pq[i].val < pq[j].val }
+func (pq PriorityQueue) Swap(i, j int)      { pq[i], pq[j] = pq[j], pq[i] }
+
+func (pq *PriorityQueue) Push(x interface{}) {
+	item := x.(*Pixel)
+	*pq = append(*pq, item)
+}
+
+func (pq *PriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	*pq = old[0 : n-1]
+	return item
+}
+
+// Binarize 二值化（前景255，背景0）
+func Binarize75(gray [][]uint8) [][]uint8 {
+	height := len(gray)
+	width := len(gray[0])
+	bin := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		bin[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			if gray[y][x] < threshold76 {
+				bin[y][x] = 255 // 前景（假设目标为深色）
+			} else {
+				bin[y][x] = 0 // 背景
+			}
+		}
+	}
+	return bin
+}
+
+// Erode 形态学腐蚀（去除边缘像素，缩小前景）
+func Erode(bin [][]uint8) [][]uint8 {
+	height := len(bin)
+	width := len(bin[0])
+	eroded := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		eroded[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			// 边界像素腐蚀为背景
+			if x < 1 || x >= width-1 || y < 1 || y >= height-1 {
+				eroded[y][x] = 0
+				continue
+			}
+			// 3x3邻域全为前景才保留
+			allForeground := true
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					if bin[y+ky][x+kx] == 0 {
+						allForeground = false
+						break
+					}
+				}
+				if !allForeground {
+					break
+				}
+			}
+			if allForeground {
+				eroded[y][x] = 255
+			} else {
+				eroded[y][x] = 0
+			}
+		}
+	}
+	return eroded
+}
+
+// Dilate 形态学膨胀（扩展边缘像素，扩大前景）
+func Dilate(bin [][]uint8) [][]uint8 {
+	height := len(bin)
+	width := len(bin[0])
+	dilated := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		dilated[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			// 边界像素膨胀为背景
+			if x < 1 || x >= width-1 || y < 1 || y >= height-1 {
+				dilated[y][x] = 0
+				continue
+			}
+			// 3x3邻域有一个前景则保留
+			hasForeground := false
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					if bin[y+ky][x+kx] == 255 {
+						hasForeground = true
+						break
+					}
+				}
+				if hasForeground {
+					break
+				}
+			}
+			if hasForeground {
+				dilated[y][x] = 255
+			} else {
+				dilated[y][x] = 0
+			}
+		}
+	}
+	return dilated
+}
+
+// DistanceTransform 计算前景到背景的欧氏距离变换
+func DistanceTransform(bin [][]uint8) [][]float64 {
+	height := len(bin)
+	width := len(bin[0])
+	dist := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		dist[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			if bin[y][x] == 0 { // 背景距离为0
+				dist[y][x] = 0
+				continue
+			}
+			// 找最近的背景像素计算欧氏距离
+			minDist := math.MaxFloat64
+			for by := 0; by < height; by++ {
+				for bx := 0; bx < width; bx++ {
+					if bin[by][bx] == 0 {
+						d := math.Hypot(float64(x-bx), float64(y-by))
+						if d < minDist {
+							minDist = d
+						}
+					}
+				}
+			}
+			dist[y][x] = minDist
+		}
+	}
+	return dist
+}
+
+// MarkSeeds 标记前景种子点（距离变换的局部最大值）
+func MarkSeeds(dist [][]float64, eroded [][]uint8) [][]int {
+	height := len(dist)
+	width := len(dist[0])
+	seeds := make([][]int, height)
+	for y := 0; y < height; y++ {
+		seeds[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			seeds[y][x] = -1 // -1表示非种子
+		}
+	}
+
+	// 仅在确定前景（eroded）中找种子
+	label := 1
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			if eroded[y][x] == 255 && dist[y][x] > distThreshold76 {
+				// 判断是否为局部最大值（3x3邻域）
+				isMax := true
+				for ky := -1; ky <= 1; ky++ {
+					for kx := -1; kx <= 1; ky++ {
+						if dist[y+ky][x+kx] > dist[y][x] {
+							isMax = false
+							break
+						}
+					}
+					if !isMax {
+						break
+					}
+				}
+				if isMax {
+					seeds[y][x] = label
+					label++
+				}
+			}
+		}
+	}
+	return seeds
+}
+
+// Watershed 分水岭变换
+func Watershed(gray [][]uint8, seeds [][]int, unknown [][]uint8) [][]int {
+	height := len(gray)
+	width := len(gray[0])
+	labels := make([][]int, height) // 标记结果：0为分水岭，>0为区域
+	for y := 0; y < height; y++ {
+		labels[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			labels[y][x] = -1 // 初始未标记
+		}
+	}
+
+	// 8邻域方向
+	dirs := []image.Point{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1},
+		{1, -1}, {1, 0}, {1, 1}}
+
+	// 初始化优先队列（按灰度值从小到大，即从低到高淹没）
+	pq := make(PriorityQueue, 0)
+	heap.Init(&pq)
+
+	// 加入种子点（前景种子）和确定背景
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if seeds[y][x] > 0 { // 前景种子
+				labels[y][x] = seeds[y][x]
+				heap.Push(&pq, &Pixel{val: int(gray[y][x]), x: x, y: y, label: seeds[y][x]})
+			} else if unknown[y][x] == 0 { // 确定背景（非未知区域）
+				labels[y][x] = 0 // 背景标记为0（非分水岭）
+				heap.Push(&pq, &Pixel{val: int(gray[y][x]), x: x, y: y, label: 0})
+			}
+		}
+	}
+
+	// 模拟水流淹没
+	for pq.Len() > 0 {
+		p := heap.Pop(&pq).(*Pixel)
+		x, y := p.x, p.y
+
+		// 处理8邻域
+		for _, d := range dirs {
+			nx, ny := x+d.X, y+d.Y
+			if nx >= 0 && nx < width && ny >= 0 && ny < height && labels[ny][nx] == -1 {
+				// 未知区域像素，标记为当前区域
+				labels[ny][nx] = p.label
+				heap.Push(&pq, &Pixel{val: int(gray[ny][nx]), x: nx, y: ny, label: p.label})
+			} else if nx >= 0 && nx < width && ny >= 0 && ny < height && labels[ny][nx] != -1 && labels[ny][nx] != p.label {
+				// 不同区域相遇，标记为分水岭（0）
+				labels[ny][nx] = 0
+			}
+		}
+	}
+
+	return labels
+}
+
+// VisualizeLabels 将分割结果可视化（不同区域不同颜色）
+func VisualizeLabels(labels [][]int) [][]uint8 {
+	height := len(labels)
+	width := len(labels[0])
+	// 定义颜色表（8种颜色，可扩展）
+	colors := []color.RGBA{
+		{255, 0, 0, 255},   // 分水岭（红）
+		{0, 255, 0, 255},   // 区域1（绿）
+		{0, 0, 255, 255},   // 区域2（蓝）
+		{255, 255, 0, 255}, // 区域3（黄）
+		{255, 0, 255, 255}, // 区域4（品红）
+		{0, 255, 255, 255}, // 区域5（青）
+		{128, 0, 0, 255},   // 区域6（深红）
+		{0, 128, 0, 255},   // 区域7（深绿）
+	}
+
+	result := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			label := labels[y][x]
+			if label == 0 { // 分水岭
+				result.SetRGBA(x, y, colors[0])
+			} else if label > 0 { // 区域（循环使用颜色表）
+				colorIdx := label % (len(colors) - 1)
+				result.SetRGBA(x, y, colors[colorIdx+1])
+			} else { // 未标记区域（黑）
+				result.SetRGBA(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+
+	// 转为灰度矩阵（便于保存）
+	vis := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		vis[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			r, g, b, _ := result.At(x, y).RGBA()
+			vis[y][x] = uint8(0.299*float64(r>>8) + 0.587*float64(g>>8) + 0.114*float64(b>>8))
+		}
+	}
+	return vis
+}
+
+// ========================================================================
+
+// case76 图像提取质心
+
+// 算法原理
+//预处理：将图像转为二值化（前景255，背景0），区分目标与背景。
+//连通域分析：用 BFS/DFS 标记所有独立的目标区域（连通域）。
+//质心计算：对每个连通域，计算所有像素的 x 坐标之和与 y 坐标之和，分别除以像素总数，得到质心坐标(Cx, Cy) (学习了解公式可以问问ai)
+
+func case76() {
+	src := getTestImg()
+	gray := ToGrayMatrix(src)
+
+	// 2. 二值化（区分目标和背景）
+	bin := Binarize76(gray)
+
+	// 3. 找到所有连通域（目标区域）
+	components := FindConnectedComponents(bin)
+	fmt.Printf("检测到 %d 个目标区域\n", len(components))
+
+	// 4. 计算每个区域的质心
+	components = CalculateCentroids(components)
+
+	// 5. 输出质心坐标
+	for i, comp := range components {
+		fmt.Printf("目标 %d 质心: (%d, %d)\n", i+1, comp.centroid.X, comp.centroid.Y)
+	}
+
+	outputPath := "output_case76.png"
+
+	// 6. 在图像上绘制质心并保存
+	resultImg := DrawCentroids(gray, components)
+	if err := SaveImage76(resultImg, outputPath); err != nil {
+		fmt.Printf("保存图像错误: %v\n", err)
+		return
+	}
+
+	fmt.Printf("质心提取完成，结果已保存到 %s\n", outputPath)
+}
+
+// SaveImage 保存图像
+func SaveImage76(img image.Image, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("创建文件失败: %w", err)
+	}
+	defer file.Close()
+	return png.Encode(file, img)
+}
+
+// 连通域结构：包含像素坐标和质心
+type ConnectedComponent struct {
+	pixels   []image.Point // 区域内所有像素
+	centroid image.Point   // 质心坐标
+}
+
+// Binarize 二值化：前景255（目标），背景0（非目标）
+func Binarize76(gray [][]uint8) [][]uint8 {
+	height := len(gray)
+	width := len(gray[0])
+	bin := make([][]uint8, height)
+	for y := 0; y < height; y++ {
+		bin[y] = make([]uint8, width)
+		for x := 0; x < width; x++ {
+			if gray[y][x] < threshold76 { // 假设目标为深色，可根据实际反转
+				bin[y][x] = 255 // 前景（目标）
+			} else {
+				bin[y][x] = 0 // 背景
+			}
+		}
+	}
+	return bin
+}
+
+// FindConnectedComponents 找到所有连通域（4连通）
+func FindConnectedComponents(bin [][]uint8) []ConnectedComponent {
+	height := len(bin)
+	width := len(bin[0])
+	visited := make([][]bool, height) // 标记是否访问过
+	for y := range visited {
+		visited[y] = make([]bool, width)
+	}
+
+	var components []ConnectedComponent
+	dirs := []image.Point{{0, 1}, {0, -1}, {1, 0}, {-1, 0}} // 4连通方向
+
+	// 遍历所有像素，寻找未访问的前景像素作为连通域起点
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if bin[y][x] == 255 && !visited[y][x] {
+				// BFS遍历连通域
+				queue := list.New()
+				queue.PushBack(image.Point{x, y})
+				visited[y][x] = true
+				var component ConnectedComponent
+
+				// 收集当前连通域的所有像素
+				for queue.Len() > 0 {
+					p := queue.Remove(queue.Front()).(image.Point)
+					component.pixels = append(component.pixels, p)
+
+					// 检查4邻域
+					for _, d := range dirs {
+						nx, ny := p.X+d.X, p.Y+d.Y
+						if nx >= 0 && nx < width && ny >= 0 && ny < height && bin[ny][nx] == 255 && !visited[ny][nx] {
+							visited[ny][nx] = true
+							queue.PushBack(image.Point{nx, ny})
+						}
+					}
+				}
+
+				components = append(components, component)
+			}
+		}
+	}
+
+	return components
+}
+
+// CalculateCentroids 计算每个连通域的质心
+func CalculateCentroids(components []ConnectedComponent) []ConnectedComponent {
+	for i := range components {
+		comp := &components[i]
+		if len(comp.pixels) == 0 {
+			continue // 空区域跳过
+		}
+
+		var sumX, sumY int
+		for _, p := range comp.pixels {
+			sumX += p.X
+			sumY += p.Y
+		}
+
+		// 质心坐标（四舍五入为整数）
+		n := len(comp.pixels)
+		comp.centroid.X = sumX / n
+		comp.centroid.Y = sumY / n
+	}
+	return components
+}
+
+// DrawCentroids 在图像上绘制质心（十字标记）
+func DrawCentroids(gray [][]uint8, components []ConnectedComponent) image.Image {
+	height := len(gray)
+	width := len(gray[0])
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 先绘制灰度图作为背景
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			val := gray[y][x]
+			img.SetRGBA(x, y, color.RGBA{val, val, val, 255})
+		}
+	}
+
+	// 绘制每个质心（红色十字，线宽2像素）
+	crossSize := 5 // 十字大小
+	for _, comp := range components {
+		cx, cy := comp.centroid.X, comp.centroid.Y
+		if cx < 0 || cx >= width || cy < 0 || cy >= height {
+			continue // 质心超出图像范围
+		}
+
+		// 绘制十字横线（左右）
+		for dx := -crossSize; dx <= crossSize; dx++ {
+			x := cx + dx
+			if x >= 0 && x < width {
+				img.SetRGBA(x, cy, color.RGBA{255, 0, 0, 255})   // 红线
+				img.SetRGBA(x, cy+1, color.RGBA{255, 0, 0, 255}) // 线宽2
+			}
+		}
+
+		// 绘制十字竖线（上下）
+		for dy := -crossSize; dy <= crossSize; dy++ {
+			y := cy + dy
+			if y >= 0 && y < height {
+				img.SetRGBA(cx, y, color.RGBA{255, 0, 0, 255})   // 红线
+				img.SetRGBA(cx+1, y, color.RGBA{255, 0, 0, 255}) // 线宽2
+			}
+		}
+	}
+
+	return img
+}
+
+// ========================================================================
+
+// case77
+
+func case77() {
+
+}
+
+// ========================================================================
+
+// case78
+
+// ========================================================================
+
+// case79
+
+// ========================================================================
+
+// case80
+
+// ========================================================================
+
+// case81
+
+// ========================================================================
+
+// case82
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
+
+// ========================================================================
 
 // ========================================================================
 
