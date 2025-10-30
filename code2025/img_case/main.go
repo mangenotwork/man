@@ -164,7 +164,19 @@ func main() {
 
 	// case75()
 
-	case76()
+	// case76()
+
+	// case78()
+
+	// case79()
+
+	// case80()
+
+	// case81()
+
+	// case82()
+
+	case83()
 }
 
 func getTestImg() image.Image {
@@ -7020,47 +7032,1056 @@ func DrawCentroids(gray [][]uint8, components []ConnectedComponent) image.Image 
 
 // ========================================================================
 
-// case77
+// case77 基于 BT.601 标准（常用于传统视频和图像领域）实现的 RGB 到 YUV 转换函数。
+//YUV 颜色空间中，Y表示亮度（Luminance），U和V表示色度（Chrominance），该实现适用于 8 位（0-255）的 RGB 输入，
+//输出符合 BT.601 标准范围的 YUV 值（Y:16-235，U/V:16-240）。
 
 func case77() {
+	// 测试示例：常见颜色的RGB转YUV
+	testCases := []struct {
+		name    string
+		r, g, b uint8
+	}{
+		{"黑色", 0, 0, 0},
+		{"白色", 255, 255, 255},
+		{"红色", 255, 0, 0},
+		{"绿色", 0, 255, 0},
+		{"蓝色", 0, 0, 255},
+		{"黄色", 255, 255, 0},
+	}
 
+	for _, tc := range testCases {
+		y, u, v := RGBToYUV(tc.r, tc.g, tc.b)
+		fmt.Printf("%s (R:%d, G:%d, B:%d) → Y:%d, U:%d, V:%d\n",
+			tc.name, tc.r, tc.g, tc.b, y, u, v)
+	}
+
+	// 测试案例：使用前文RGB转YUV的结果反向验证（应还原原始RGB）
+	testCases2 := []struct {
+		name                string
+		y, u, v             uint8 // 输入YUV（来自RGB转YUV的输出）
+		wantR, wantG, wantB uint8 // 期望还原的RGB
+	}{
+		{"黑色", 16, 128, 128, 0, 0, 0},
+		{"白色", 235, 128, 128, 255, 255, 255},
+		{"红色", 81, 128, 240, 255, 0, 0},   // 红色RGB转YUV的结果
+		{"绿色", 145, 44, 16, 0, 255, 0},    // 绿色RGB转YUV的结果
+		{"蓝色", 32, 240, 128, 0, 0, 255},   // 蓝色RGB转YUV的结果
+		{"黄色", 210, 44, 240, 255, 255, 0}, // 黄色RGB转YUV的结果
+	}
+
+	for _, tc := range testCases2 {
+		r, g, b := YUVToRGB(tc.y, tc.u, tc.v)
+		fmt.Printf("%s (Y:%d, U:%d, V:%d) → RGB(%d,%d,%d) 期望(%d,%d,%d)\n",
+			tc.name, tc.y, tc.u, tc.v, r, g, b, tc.wantR, tc.wantG, tc.wantB)
+	}
+}
+
+// RGBToYUV 将8位RGB值（0-255）转换为BT.601标准的YUV值
+// Y范围：16-235（亮度），U和V范围：16-240（色度）
+func RGBToYUV(r, g, b uint8) (y, u, v uint8) {
+	// 将RGB转换为浮点数以便计算
+	rf := float64(r)
+	gf := float64(g)
+	bf := float64(b)
+
+	// 计算Y分量（亮度）
+	yf := 16.0 + (65.738*rf+129.057*gf+25.064*bf)/256.0
+	// 计算U分量（蓝色色度）
+	uf := 128.0 + (-37.945*rf-74.494*gf+112.439*bf)/256.0
+	// 计算V分量（红色色度）
+	vf := 128.0 + (112.439*rf-94.154*gf-18.285*bf)/256.0
+
+	// 四舍五入到整数，并裁剪到标准范围
+	yInt := int(yf + 0.5)
+	uInt := int(uf + 0.5)
+	vInt := int(vf + 0.5)
+
+	// 确保Y在16-235范围内
+	yInt = clamp77(yInt, 16, 235)
+	// 确保U和V在16-240范围内
+	uInt = clamp77(uInt, 16, 240)
+	vInt = clamp77(vInt, 16, 240)
+
+	return uint8(yInt), uint8(uInt), uint8(vInt)
+}
+
+// clamp 辅助函数：将值限制在[min, max]范围内
+func clamp77(x, min, max int) int {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
+
+// YUVToRGB 将BT.601标准的YUV值转换为8位RGB值（0-255）
+// 输入范围：Y∈[16,235]，U∈[16,240]，V∈[16,240]
+// 输出范围：R、G、B∈[0,255]
+func YUVToRGB(y, u, v uint8) (r, g, b uint8) {
+	// 1. 先将YUV钳位到标准范围（避免输入异常值导致转换错误）
+	yClamped := clampY(y)
+	uClamped := clampUV(u)
+	vClamped := clampUV(v)
+
+	// 2. 转换为浮点数并计算偏移校正（消除基准值）
+	yf := float64(yClamped - 16)  // Y基准值16，校正后范围0-219
+	uf := float64(uClamped - 128) // U基准值128，校正后范围-112-112
+	vf := float64(vClamped - 128) // V基准值128，校正后范围-112-112
+
+	// 3. 应用BT.601逆转换公式计算RGB
+	rf := 1.164*yf + 1.596*vf
+	gf := 1.164*yf - 0.391*uf - 0.813*vf
+	bf := 1.164*yf + 2.018*uf
+
+	// 4. 四舍五入并钳位到0-255范围
+	rInt := int(rf + 0.5)
+	gInt := int(gf + 0.5)
+	bInt := int(bf + 0.5)
+
+	rInt = clampRGB(rInt)
+	gInt = clampRGB(gInt)
+	bInt = clampRGB(bInt)
+
+	return uint8(rInt), uint8(gInt), uint8(bInt)
+}
+
+// 辅助函数：将Y钳位到16-235范围
+func clampY(y uint8) uint8 {
+	if y < 16 {
+		return 16
+	}
+	if y > 235 {
+		return 235
+	}
+	return y
+}
+
+// 辅助函数：将U/V钳位到16-240范围
+func clampUV(uv uint8) uint8 {
+	if uv < 16 {
+		return 16
+	}
+	if uv > 240 {
+		return 240
+	}
+	return uv
+}
+
+// 辅助函数：将RGB钳位到0-255范围
+func clampRGB(x int) int {
+	if x < 0 {
+		return 0
+	}
+	if x > 255 {
+		return 255
+	}
+	return x
 }
 
 // ========================================================================
 
-// case78
+// case78 基于 Y 分量的双边滤波磨皮算法
+// 该算法通过在 YUV 颜色空间中对亮度分量（Y）进行双边滤波，实现平滑皮肤瑕疵同时保留五官边缘的效果，最后转换回 RGB 空间输出结果。
+
+// 算法原理
+//颜色空间转换：将 RGB 图像转为 YUV，分离出亮度分量（Y）和色度分量（U、V）。皮肤瑕疵主要体现在亮度变化上，仅处理 Y 分量可减少对色彩的干扰。
+//双边滤波：一种同时考虑空间距离和像素值差异的滤波方法：
+//空间权重：距离越近的像素权重越大（高斯分布）。
+//范围权重：亮度差异越小的像素权重越大（高斯分布）。
+//两者结合可平滑相似亮度区域（皮肤），同时保留亮度突变区域（五官边缘）。
+//逆转换：将处理后的 Y 分量与原始 U、V 分量结合，转回 RGB 图像。
+
+// 扩展，人物描边区域标记，只对指定区域进行磨皮
+
+func case78() {
+	src := getImg("./test2.jpg")
+	outputPath := "output_case78.jpg"
+
+	// 转换为YUV
+	Y, U, V := imgToYUV(src)
+
+	// 双边滤波Y分量
+	filteredY := bilateralFilterY(Y)
+
+	// 转换回RGB
+	resultImg := yuvToImg(filteredY, U, V)
+
+	// 保存图像
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+	println("磨皮完成，结果已保存至:", outputPath)
+}
+
+// 双边滤波参数（可调整）
+const (
+	windowRadius = 3    // 滤波窗口半径（7x7窗口，平滑效果更自然）
+	sigmaS       = 2.0  // 空间高斯标准差，控制空间影响范围
+	sigmaR       = 30.0 // 亮度差异标准差，控制磨皮强度（值越大平滑越强）
+)
+
+// RGB转YUV（严格遵循BT.601标准，修复U/V分量计算）
+// 输入：R/G/B (0-255)
+// 输出：Y(16-235), U(16-240), V(16-240)
+func RGBToYUV78(r, g, b uint8) (y, u, v uint8) {
+	rf, gf, bf := float64(r), float64(g), float64(b)
+
+	// 标准BT.601 Y分量公式（亮度）
+	yf := 0.299*rf + 0.587*gf + 0.114*bf
+	// 转换Y到16-235范围（0-255 → 16-235）
+	yf = 16 + (yf * 219 / 255)
+
+	// 标准BT.601 U(Cb)分量公式（蓝色色度）
+	// 正确公式：Cb = 128 - 0.1687*R - 0.3313*G + 0.5*B
+	uf := 128.0 - 0.168736*rf - 0.331264*gf + 0.5*bf
+
+	// 标准BT.601 V(Cr)分量公式（红色色度）
+	// 正确公式：Cr = 128 + 0.5*R - 0.4187*G - 0.0813*B
+	vf := 128.0 + 0.5*rf - 0.418688*gf - 0.081312*bf
+
+	// 钳位到标准范围（防止溢出导致偏色）
+	y = clamp78(yf, 16, 235)
+	u = clamp78(uf, 16, 240)
+	v = clamp78(vf, 16, 240)
+	return
+}
+
+// YUV转RGB（修复逆转换公式，确保颜色还原正确）
+// 输入：Y(16-235), U(16-240), V(16-240)
+// 输出：R/G/B (0-255)
+func YUVToRGB78(y, u, v uint8) (r, g, b uint8) {
+	// 将YUV从标准范围转换为归一化值
+	yNorm := (float64(y) - 16) * (255.0 / 219.0) // Y:16-235 → 0-255
+	uNorm := float64(u) - 128.0                  // U:16-240 → -112-112
+	vNorm := float64(v) - 128.0                  // V:16-240 → -112-112
+
+	// 标准BT.601逆转换公式
+	rf := yNorm + 1.402*vNorm                   // 红色 = 亮度 + 红色色度影响
+	gf := yNorm - 0.34414*uNorm - 0.71414*vNorm // 绿色 = 亮度 - 蓝/红色度影响
+	bf := yNorm + 1.772*uNorm                   // 蓝色 = 亮度 + 蓝色色度影响
+
+	// 钳位到0-255（防止溢出导致颜色错误）
+	r = clamp78(rf, 0, 255)
+	g = clamp78(gf, 0, 255)
+	b = clamp78(bf, 0, 255)
+	return
+}
+
+// 通用钳位函数（处理float64到uint8的范围限制）
+func clamp78(val float64, min, max float64) uint8 {
+	if val < min {
+		return uint8(min)
+	}
+	if val > max {
+		return uint8(max)
+	}
+	return uint8(val + 0.5) // 四舍五入
+}
+
+// 图像转YUV分量（分离亮度和色度）
+func imgToYUV(img image.Image) (Y, U, V [][]uint8) {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	Y = make([][]uint8, height)
+	U = make([][]uint8, height)
+	V = make([][]uint8, height)
+	for i := range Y {
+		Y[i] = make([]uint8, width)
+		U[i] = make([]uint8, width)
+		V[i] = make([]uint8, width)
+	}
+
+	// 遍历每个像素转换为YUV
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 从图像中获取RGB值（注意RGBA返回的是0-65535，需转换为0-255）
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			Y[y][x], U[y][x], V[y][x] = RGBToYUV78(r8, g8, b8)
+		}
+	}
+	return Y, U, V
+}
+
+// 双边滤波（仅平滑Y分量，保留U/V分量以维持颜色）
+func bilateralFilterY(Y [][]uint8) [][]uint8 {
+	height := len(Y)
+	if height == 0 {
+		return nil
+	}
+	width := len(Y[0])
+	result := make([][]uint8, height)
+	for i := range result {
+		result[i] = make([]uint8, width)
+	}
+
+	// 预计算空间权重（高斯分布，只与距离有关）
+	spaceWeights := make([][]float64, 2*windowRadius+1)
+	for i := range spaceWeights {
+		spaceWeights[i] = make([]float64, 2*windowRadius+1)
+		for j := range spaceWeights[i] {
+			dx := i - windowRadius
+			dy := j - windowRadius
+			// 空间高斯公式：exp(-(dx²+dy²)/(2σ²))
+			spaceWeights[i][j] = math.Exp(-(float64(dx*dx + dy*dy)) / (2 * sigmaS * sigmaS))
+		}
+	}
+
+	// 遍历每个像素计算滤波结果
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			centerY := float64(Y[y][x])
+			sumWeight := 0.0
+			sumValue := 0.0
+
+			// 遍历窗口内的邻域像素
+			for ky := -windowRadius; ky <= windowRadius; ky++ {
+				for kx := -windowRadius; kx <= windowRadius; kx++ {
+					nx := x + kx
+					ny := y + ky
+					// 处理边界（超出图像范围的像素忽略）
+					if nx < 0 || nx >= width || ny < 0 || ny >= height {
+						continue
+					}
+
+					// 空间权重（预计算的高斯值）
+					sw := spaceWeights[ky+windowRadius][kx+windowRadius]
+					// 范围权重（基于亮度差异的高斯值）
+					deltaY := float64(Y[ny][nx]) - centerY
+					rw := math.Exp(-(deltaY * deltaY) / (2 * sigmaR * sigmaR))
+					// 总权重 = 空间权重 × 范围权重
+					totalWeight := sw * rw
+
+					sumWeight += totalWeight
+					sumValue += totalWeight * float64(Y[ny][nx])
+				}
+			}
+
+			// 加权平均得到滤波后的Y值
+			if sumWeight > 0 {
+				result[y][x] = uint8(sumValue / sumWeight)
+			} else {
+				result[y][x] = Y[y][x] // 权重为0时保留原始值
+			}
+		}
+	}
+
+	return result
+}
+
+// YUV分量转图像（合并处理后的Y和原始U/V）
+func yuvToImg(Y, U, V [][]uint8) image.Image {
+	height := len(Y)
+	if height == 0 {
+		return nil
+	}
+	width := len(Y[0])
+	bounds := image.Rect(0, 0, width, height)
+	rgba := image.NewRGBA(bounds)
+
+	// 遍历每个像素转换回RGB
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r, g, b := YUVToRGB78(Y[y][x], U[y][x], V[y][x])
+			rgba.SetRGBA(x, y, color.RGBA{r, g, b, 255})
+		}
+	}
+	return rgba
+}
 
 // ========================================================================
 
-// case79
+// case79 灰度化
+
+// 灰度化原理说明
+//均值灰度化：直接取 RGB 三个分量的算术平均值，简单但未考虑人眼对颜色的敏感度差异。公式：Gray = (R + G + B) / 3
+//经典灰度化：基于 BT.601 标准，按人眼对红、绿、蓝的敏感度分配权重（绿色敏感度最高）。公式：Gray = 0.299×R + 0.587×G + 0.114×B
+//Photoshop 灰度化：采用 Rec.709 标准（高清视频 / 图像常用），权重更贴近现代显示设备的色域特性。公式：Gray = 0.2126×R + 0.7152×G + 0.0722×B
+
+func case79() {
+	inputPath := "./test2.jpg"
+	// 分别应用三种灰度化方法并保存
+	if err := grayscaleImage(inputPath, "output_case79_mean_gray.jpg", MeanGrayscale); err != nil {
+		fmt.Printf("均值灰度化失败: %v\n", err)
+	} else {
+		fmt.Println("均值灰度化完成: mean_gray.jpg")
+	}
+
+	if err := grayscaleImage(inputPath, "output_case79_classic_gray.jpg", ClassicGrayscale); err != nil {
+		fmt.Printf("经典灰度化失败: %v\n", err)
+	} else {
+		fmt.Println("经典灰度化完成: classic_gray.jpg")
+	}
+
+	if err := grayscaleImage(inputPath, "output_case79_ps_gray.jpg", PhotoshopGrayscale); err != nil {
+		fmt.Printf("Photoshop灰度化失败: %v\n", err)
+	} else {
+		fmt.Println("Photoshop灰度化完成: ps_gray.jpg")
+	}
+}
+
+// MeanGrayscale 均值灰度化：(R + G + B) / 3
+func MeanGrayscale(r, g, b uint8) uint8 {
+	// 先转换为int避免uint8溢出（如255+255+255=765，超出uint8范围）
+	sum := int(r) + int(g) + int(b)
+	return uint8(sum / 3)
+}
+
+// ClassicGrayscale 经典灰度化（BT.601标准）：0.299R + 0.587G + 0.114B
+func ClassicGrayscale(r, g, b uint8) uint8 {
+	// 转换为float64计算，四舍五入后转回uint8
+	gray := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+	return uint8(gray + 0.5) // +0.5实现四舍五入
+}
+
+// PhotoshopGrayscale Photoshop灰度化（Rec.709标准）：0.2126R + 0.7152G + 0.0722B
+func PhotoshopGrayscale(r, g, b uint8) uint8 {
+	gray := 0.2126*float64(r) + 0.7152*float64(g) + 0.0722*float64(b)
+	return uint8(gray + 0.5) // 四舍五入
+}
+
+// 将图像按指定灰度化函数处理并保存
+func grayscaleImage(inputPath, outputPath string, grayscaleFunc func(r, g, b uint8) uint8) error {
+	// 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("打开图片失败: %v", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return fmt.Errorf("解码图片失败: %v", err)
+	}
+
+	// 创建灰度图像（使用RGBA格式存储，R=G=B=灰度值）
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	grayImg := image.NewRGBA(bounds)
+
+	// 遍历每个像素应用灰度化
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取RGB值（注意：RGBA返回0-65535，需转换为0-255）
+			r, g, b, a := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// 计算灰度值
+			gray := grayscaleFunc(r8, g8, b8)
+
+			// 灰度图像的RGB分量均为灰度值，保留原始透明度
+			grayImg.SetRGBA(x, y, color.RGBA{gray, gray, gray, uint8(a >> 8)})
+		}
+	}
+
+	// 保存输出图像
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("创建输出文件失败: %v", err)
+	}
+	defer outputFile.Close()
+
+	// 以高质量保存JPEG
+	return jpeg.Encode(outputFile, grayImg, &jpeg.Options{Quality: 95})
+}
 
 // ========================================================================
 
-// case80
+// case80 图像阈值化
+
+//阈值化原理说明
+//阈值化是将灰度图像（像素值 0-255）转换为二值图像（或特定范围值）的过程，核心是通过预设阈值T划分像素：
+//1. 简单阈值化：灰度值 ≥ T → 255（白色），否则 → 0（黑色）
+//2. 反阈值化：灰度值 ≥ T → 0（黑色），否则 → 255（白色）
+//3. 截断阈值化：灰度值 ≥ T → T（阈值），否则保持原始灰度值
+
+func case80() {
+
+	inputPath := "./test2.jpg"
+
+	// 生成三种阈值化结果
+	if err := thresholdImage(inputPath, "output_case80_simple_threshold.jpg", threshold, SimpleThreshold); err != nil {
+		fmt.Printf("简单阈值化失败: %v\n", err)
+	} else {
+		fmt.Println("简单阈值化完成: simple_threshold.jpg")
+	}
+
+	if err := thresholdImage(inputPath, "output_case80_inverse_threshold.jpg", threshold, InverseThreshold); err != nil {
+		fmt.Printf("反阈值化失败: %v\n", err)
+	} else {
+		fmt.Println("反阈值化完成: inverse_threshold.jpg")
+	}
+
+	if err := thresholdImage(inputPath, "output_case80_truncate_threshold.jpg", threshold, TruncateThreshold); err != nil {
+		fmt.Printf("截断阈值化失败: %v\n", err)
+	} else {
+		fmt.Println("截断阈值化完成: truncate_threshold.jpg")
+	}
+}
+
+// 灰度化函数（复用之前的经典灰度化，作为阈值化的前置处理）
+// ClassicGrayscale 经典灰度化（BT.601标准）：0.299R + 0.587G + 0.114B
+func ClassicGrayscale80(r, g, b uint8) uint8 {
+	gray := 0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)
+	return uint8(gray + 0.5) // 四舍五入
+}
+
+//  阈值化核心函数
+
+// SimpleThreshold 简单阈值化：gray >= threshold → 255，否则 → 0
+func SimpleThreshold(gray, threshold uint8) uint8 {
+	if gray >= threshold {
+		return 255
+	}
+	return 0
+}
+
+// InverseThreshold 反阈值化：gray >= threshold → 0，否则 → 255
+func InverseThreshold(gray, threshold uint8) uint8 {
+	if gray >= threshold {
+		return 0
+	}
+	return 255
+}
+
+// TruncateThreshold 截断阈值化：gray >= threshold → threshold，否则保持原值
+func TruncateThreshold(gray, threshold uint8) uint8 {
+	if gray >= threshold {
+		return threshold
+	}
+	return gray
+}
+
+// 先将彩色图像转为灰度图，再应用阈值化处理
+func thresholdImage(inputPath, outputPath string, threshold uint8, thresholdFunc func(gray, threshold uint8) uint8) error {
+	// 1. 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("打开图片失败: %v", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return fmt.Errorf("解码图片失败: %v", err)
+	}
+
+	// 2. 转换为灰度图（阈值化需基于灰度图）
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	grayImg := image.NewRGBA(bounds)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
+			gray := ClassicGrayscale80(r8, g8, b8)
+			grayImg.SetRGBA(x, y, color.RGBA{gray, gray, gray, uint8(a >> 8)})
+		}
+	}
+
+	// 3. 应用阈值化处理
+	resultImg := image.NewRGBA(bounds)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 从灰度图中取灰度值（R=G=B，取R即可）
+			gray, _, _, a := grayImg.At(x, y).RGBA()
+			gray8 := uint8(gray >> 8)
+
+			// 应用阈值化函数
+			thresholded := thresholdFunc(gray8, threshold)
+
+			// 阈值化后的像素：RGB分量相同，保留透明度
+			resultImg.SetRGBA(x, y, color.RGBA{thresholded, thresholded, thresholded, uint8(a >> 8)})
+		}
+	}
+
+	// 4. 保存结果
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("创建输出文件失败: %v", err)
+	}
+	defer outputFile.Close()
+
+	return jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+}
 
 // ========================================================================
 
-// case81
+// case81 图像均值滤波
+
+// 均值滤波原理
+//均值滤波是一种线性平滑滤波，核心逻辑是：
+//定义一个滑动窗口（通常为奇数大小，如 3x3、5x5），窗口中心为当前处理的像素。
+//计算窗口内所有像素的 RGB 分量平均值（每个通道单独计算）。
+//用平均值替换窗口中心像素的 RGB 值，Alpha 通道（透明度）保持不变。
+
+func case81() {
+
+	src := getImg("./test2.jpg")
+
+	outputPath := "output_case81.jpg"
+
+	// 解析窗口半径
+	radius := 20 // 无效窗口半径: 1,2,3...
+
+	// 应用均值滤波
+	filteredImg := MeanFilter(src, radius)
+
+	// 保存输出图像
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic(fmt.Sprintf("无法创建输出文件: %v", err))
+	}
+	defer outputFile.Close()
+
+	// 以高质量保存JPEG（减少压缩失真）
+	jpeg.Encode(outputFile, filteredImg, &jpeg.Options{Quality: 95})
+	fmt.Printf("均值滤波完成（窗口半径=%d），结果已保存至: %s\n", radius, outputPath)
+}
+
+// MeanFilter 对图像应用均值滤波
+// input: 输入图像
+// radius: 窗口半径（窗口大小为 2*radius + 1，如radius=1对应3x3窗口）
+// 返回处理后的图像
+func MeanFilter(input image.Image, radius int) image.Image {
+	if radius < 1 {
+		return input // 半径为0时返回原图
+	}
+
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	output := image.NewRGBA(bounds) // 输出图像（RGBA格式）
+
+	// 遍历每个像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 计算窗口范围（处理边界：避免超出图像范围）
+			minX := max(0, x-radius)
+			maxX := min(width-1, x+radius)
+			minY := max(0, y-radius)
+			maxY := min(height-1, y+radius)
+
+			// 累加窗口内所有像素的RGB值，并计数像素数量
+			var rSum, gSum, bSum int
+			pixelCount := 0
+
+			for wy := minY; wy <= maxY; wy++ {
+				for wx := minX; wx <= maxX; wx++ {
+					// 获取窗口内像素的RGBA值（0-65535），转换为0-255
+					r, g, b, _ := input.At(wx, wy).RGBA()
+					r8 := int(r >> 8)
+					g8 := int(g >> 8)
+					b8 := int(b >> 8)
+
+					rSum += r8
+					gSum += g8
+					bSum += b8
+					pixelCount++
+				}
+			}
+
+			// 计算平均值（四舍五入）
+			avgR := uint8(rSum/pixelCount + (rSum%pixelCount)*2/pixelCount) // 简单四舍五入
+			avgG := uint8(gSum/pixelCount + (gSum%pixelCount)*2/pixelCount)
+			avgB := uint8(bSum/pixelCount + (bSum%pixelCount)*2/pixelCount)
+
+			// 保留原始Alpha通道
+			_, _, _, a := input.At(x, y).RGBA()
+			a8 := uint8(a >> 8)
+
+			// 设置输出像素
+			output.SetRGBA(x, y, color.RGBA{avgR, avgG, avgB, a8})
+		}
+	}
+
+	return output
+}
 
 // ========================================================================
 
-// case82
+// case82 图像USM锐化
+
+// USM 锐化通过增强图像边缘细节实现锐化效果，原理是用原图减去其模糊版本得到边缘掩码，再将掩码叠加回原图，既能增强边缘又不易引入过多噪点，
+//是 Photoshop 等软件中常用的锐化算法。
+
+// USM 锐化原理
+//生成模糊图像：对原图进行高斯模糊（模糊程度决定锐化的范围，通常用小窗口高斯滤波）。
+//计算边缘掩码：边缘掩码 = 原图 - 模糊图像（掩码保留了原图中比模糊图更锐利的细节）。
+//叠加掩码增强锐化：锐化图 = 原图 + 数量 × 边缘掩码（“数量” 控制锐化强度，值越大锐化越明显）。
+
+func case82() {
+	src := getImg("./test2.jpg")
+
+	outputPath := "output_case82.jpg" // 输出图片路径
+	radius := 1                       // 模糊窗口半径（1→3x3窗口，推荐1-3）
+	sigma := 1.0                      // 高斯标准差（推荐0.5-2.0，与半径匹配）
+	amount := 1.5                     // 锐化强度（推荐0.5-2.0，值越大锐化越明显）
+
+	// 应用USM锐化
+	sharpenedImg := USMSharpen(src, radius, sigma, amount)
+
+	// 保存输出图像
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+
+	jpeg.Encode(outputFile, sharpenedImg, &jpeg.Options{Quality: 95})
+	println("USM锐化完成！")
+	println("输出图片:", outputPath)
+	println("使用参数: 半径=", radius, " σ=", sigma, " 强度=", amount)
+}
+
+// 生成高斯核（权重矩阵）
+func generateGaussianKernel82(radius int, sigma float64) [][]float64 {
+	size := 2*radius + 1
+	kernel := make([][]float64, size)
+	sum := 0.0
+
+	for y := 0; y < size; y++ {
+		kernel[y] = make([]float64, size)
+		for x := 0; x < size; x++ {
+			dx := x - radius
+			dy := y - radius
+			exponent := -(float64(dx*dx + dy*dy)) / (2 * sigma * sigma)
+			kernel[y][x] = math.Exp(exponent) / (2 * math.Pi * sigma * sigma)
+			sum += kernel[y][x]
+		}
+	}
+
+	// 归一化权重
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			kernel[y][x] /= sum
+		}
+	}
+
+	return kernel
+}
+
+// 高斯模糊（供USM调用）
+func gaussianBlur82(input image.Image, radius int, sigma float64) image.Image {
+	if radius < 1 || sigma <= 0 {
+		return input
+	}
+
+	kernel := generateGaussianKernel82(radius, sigma)
+	kernelSize := 2*radius + 1
+
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	output := image.NewRGBA(bounds)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			var rSum, gSum, bSum float64
+
+			for ky := 0; ky < kernelSize; ky++ {
+				for kx := 0; kx < kernelSize; kx++ {
+					imgX := x + (kx - radius)
+					imgY := y + (ky - radius)
+
+					if imgX < 0 || imgX >= width || imgY < 0 || imgY >= height {
+						continue
+					}
+
+					r, g, b, _ := input.At(imgX, imgY).RGBA()
+					r8 := float64(r >> 8)
+					g8 := float64(g >> 8)
+					b8 := float64(b >> 8)
+
+					weight := kernel[ky][kx]
+					rSum += weight * r8
+					gSum += weight * g8
+					bSum += weight * b8
+				}
+			}
+
+			r := clamp82(rSum)
+			g := clamp82(gSum)
+			b := clamp82(bSum)
+			_, _, _, a := input.At(x, y).RGBA()
+			a8 := uint8(a >> 8)
+
+			output.SetRGBA(x, y, color.RGBA{r, g, b, a8})
+		}
+	}
+
+	return output
+}
+
+// 辅助函数：四舍五入并钳位到0-255
+func clamp82(val float64) uint8 {
+	intVal := int(val + 0.5)
+	if intVal < 0 {
+		return 0
+	}
+	if intVal > 255 {
+		return 255
+	}
+	return uint8(intVal)
+}
+
+// USMSharpen 应用USM锐化
+func USMSharpen(input image.Image, radius int, sigma, amount float64) image.Image {
+	if radius < 1 || sigma <= 0 || amount <= 0 {
+		return input
+	}
+
+	// 1. 生成模糊图像
+	blurredImg := gaussianBlur82(input, radius, sigma)
+
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	output := image.NewRGBA(bounds)
+
+	// 2. 计算锐化结果
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 原图像素（0-255）
+			rOrig, gOrig, bOrig, aOrig := input.At(x, y).RGBA()
+			rO := float64(rOrig >> 8)
+			gO := float64(gOrig >> 8)
+			bO := float64(bOrig >> 8)
+
+			// 模糊图像素（0-255）
+			rBlur, gBlur, bBlur, _ := blurredImg.At(x, y).RGBA()
+			rB := float64(rBlur >> 8)
+			gB := float64(gBlur >> 8)
+			bB := float64(bBlur >> 8)
+
+			// 3. 计算边缘掩码并叠加
+			maskR := rO - rB
+			maskG := gO - gB
+			maskB := bO - bB
+
+			rSharp := rO + amount*maskR
+			gSharp := gO + amount*maskG
+			bSharp := bO + amount*maskB
+
+			// 钳位并设置像素
+			r := clamp82(rSharp)
+			g := clamp82(gSharp)
+			b := clamp82(bSharp)
+			a := uint8(aOrig >> 8)
+
+			output.SetRGBA(x, y, color.RGBA{r, g, b, a})
+		}
+	}
+
+	return output
+}
 
 // ========================================================================
 
-// ========================================================================
+// case83 LUT（Lookup Table，查找表）滤镜是通过预定义的颜色映射关系转换图像色彩的技术，
+//广泛用于照片风格化（如复古、电影感、高对比度等效果）。其核心原理是将图像的 RGB 值通过 “查找表” 映射到新的 RGB 值，实现快速色彩转换。
+
+// 实现思路
+//1.LUT 结构：使用 3D LUT（立方体结构），维度为N×N×N（常用 17×17×17，兼顾精度与性能），每个节点存储对应输入 RGB 的输出 RGB 值。
+//2.索引映射：将图像像素的 RGB 值（0-255）归一化到 0-1 范围，再映射到 LUT 的索引范围（0 到 N-1）。
+//3.三线性插值：由于输入值可能落在 LUT 节点之间，通过三线性插值计算精确的映射结果，避免色彩断层。
+
+func case83() {
+	// 配置参数（可修改）
+	inputPath := "test2.jpg"          // 输入图像路径
+	outputPath := "output_case83.jpg" // 输出图像路径
+
+	// 初始化LUT（复古暖色调效果）
+	initLUT()
+
+	// 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图片: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图片: " + err.Error())
+	}
+
+	// 应用LUT滤镜
+	resultImg := applyLUTFilter(img)
+
+	// 保存输出图像
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+	println("LUT滤镜应用完成！")
+	println("输入图片:", inputPath)
+	println("输出图片:", outputPath)
+}
+
+// 3D LUT配置（17×17×17，兼顾精度与性能）
+const lutSize = 17           // LUT维度（N）
+const lutScale = lutSize - 1 // 索引最大值（N-1）
+
+// LUT节点：存储输出RGB值（0-255）
+type LUTNode struct {
+	R, G, B uint8
+}
+
+// 全局LUT表（17×17×17）
+var lut [lutSize][lutSize][lutSize]LUTNode
+
+// 初始化示例LUT（模拟“复古暖色调”效果：增强红色/黄色，降低蓝色）
+func initLUT() {
+	for r := 0; r < lutSize; r++ {
+		for g := 0; g < lutSize; g++ {
+			for b := 0; b < lutSize; b++ {
+				// 将LUT索引转换为0-255的RGB值
+				rgbR := uint8(r * 255 / lutScale)
+				rgbG := uint8(g * 255 / lutScale)
+				rgbB := uint8(b * 255 / lutScale)
+
+				// 复古暖色调算法：增强红色，降低蓝色，微调绿色
+				newR := clamp83(rgbR + 20) // 红色+20（暖化）
+				newG := clamp83(rgbG + 5)  // 绿色+5（柔和）
+				newB := clamp83(rgbB - 30) // 蓝色-30（降低冷色）
+
+				lut[r][g][b] = LUTNode{newR, newG, newB}
+			}
+		}
+	}
+}
+
+func clamp83(x uint8) uint8 {
+	if x > 255 {
+		return 255
+	}
+	return x
+}
+
+// 三线性插值：计算输入RGB在LUT中的映射值
+func lutLookup(r, g, b uint8) (uint8, uint8, uint8) {
+	// 将RGB（0-255）映射到LUT索引（0.0 - lutScale）
+	rNorm := float64(r) / 255.0 * lutScale
+	gNorm := float64(g) / 255.0 * lutScale
+	bNorm := float64(b) / 255.0 * lutScale
+
+	// 分解为整数索引和小数部分（用于插值）
+	r0 := int(rNorm)
+	g0 := int(gNorm)
+	b0 := int(bNorm)
+	rf := rNorm - float64(r0)
+	gf := gNorm - float64(g0)
+	bf := bNorm - float64(b0)
+
+	// 确保索引不越界（极端值保护）
+	r1 := min(r0+1, lutScale)
+	g1 := min(g0+1, lutScale)
+	b1 := min(b0+1, lutScale)
+
+	// 取8个相邻节点（三线性插值需要的立方体顶点）
+	c000 := lut[r0][g0][b0]
+	c001 := lut[r0][g0][b1]
+	c010 := lut[r0][g1][b0]
+	c011 := lut[r0][g1][b1]
+	c100 := lut[r1][g0][b0]
+	c101 := lut[r1][g0][b1]
+	c110 := lut[r1][g1][b0]
+	c111 := lut[r1][g1][b1]
+
+	// 三线性插值计算（分步骤在三个维度上插值）
+	// 1. R维度插值
+	v00 := mixNode(c000, c100, rf)
+	v01 := mixNode(c001, c101, rf)
+	v10 := mixNode(c010, c110, rf)
+	v11 := mixNode(c011, c111, rf)
+
+	// 2. G维度插值
+	v0 := mixNode(v00, v10, gf)
+	v1 := mixNode(v01, v11, gf)
+
+	// 3. B维度插值
+	result := mixNode(v0, v1, bf)
+
+	return result.R, result.G, result.B
+}
+
+// 辅助函数：在两个LUT节点之间按比例插值
+func mixNode(a, b LUTNode, t float64) LUTNode {
+	return LUTNode{
+		R: uint8(float64(a.R)*(1-t) + float64(b.R)*t + 0.5),
+		G: uint8(float64(a.G)*(1-t) + float64(b.G)*t + 0.5),
+		B: uint8(float64(a.B)*(1-t) + float64(b.B)*t + 0.5),
+	}
+}
+
+// 应用LUT滤镜到图像
+func applyLUTFilter(input image.Image) image.Image {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	output := image.NewRGBA(bounds)
+
+	// 遍历每个像素应用LUT
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取像素RGB值（0-255）
+			r, g, b, a := input.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			a8 := uint8(a >> 8)
+
+			// 通过LUT映射新的RGB值
+			newR, newG, newB := lutLookup(r8, g8, b8)
+
+			// 设置输出像素（保留透明度）
+			output.SetRGBA(x, y, color.RGBA{newR, newG, newB, a8})
+		}
+	}
+
+	return output
+}
 
 // ========================================================================
 
-// ========================================================================
+// case84
 
 // ========================================================================
 
-// ========================================================================
+// case85
 
 // ========================================================================
 
+// case86
+
 // ========================================================================
+
+// case87
+
+// ========================================================================
+
+// case88
+
+// ========================================================================
+
+// case89
+
+// ========================================================================
+
+// case90
 
 // ========================================================================
 
