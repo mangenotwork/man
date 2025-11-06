@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"sync"
 )
 
 /*
@@ -38,7 +39,16 @@ func main() {
 
 	//case10()
 
-	case11()
+	//case11()
+
+	//case12()
+
+	//case13()
+	//case13_1()
+	//case13_2()
+
+	case14()
+
 }
 
 // ========================================================================
@@ -2247,13 +2257,1000 @@ func wmClamp(val uint8, min, max uint8) uint8 {
 
 // case12 基于颜色空间的皮肤检测算法
 
+// 基于颜色空间的皮肤检测算法利用了皮肤颜色在特定颜色空间中具有稳定聚类特性的特点，通过定义肤色在该空间中的阈值范围，
+//实现对皮肤区域的快速识别。常用的颜色空间包括 YCrCb（亮度 - 色度分离，抗光照变化能力强）、HSV（色调 - 饱和度 - 明度，直观反映颜色特征）等，
+//其中 YCrCb 因能有效分离亮度和色度分量，在皮肤检测中应用最广泛。
+
+// 算法原理
+//以 YCrCb 颜色空间为例，核心步骤如下：
+//颜色空间转换：将输入图像从 RGB 转换为 YCrCb（Y 为亮度，Cr 和 Cb 为色度分量）。
+//肤色阈值定义：皮肤在 Cr（红色分量）和 Cb（蓝色分量）通道中分布在特定范围（例如：Cr∈[133, 173]，Cb∈[77, 127]，不同人种略有差异）。
+//像素分类：遍历图像像素，判断其 Cr 和 Cb 值是否在肤色阈值范围内，是则标记为皮肤，否则为非皮肤。
+//后处理（可选）：通过形态学操作（如腐蚀、膨胀）去除噪声，使皮肤区域更连贯。
+
+func case12() {
+	inputPath := "test4.jpg"                 // 输入图像路径
+	resultPath := "output_case12_result.jpg" // 皮肤高亮结果
+	maskPath := "output_case12_mask.jpg"     // 皮肤掩码结果
+
+	// 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图片: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图片: " + err.Error())
+	}
+
+	// 执行皮肤检测
+	resultImg, maskImg := SkinDetection(img)
+
+	// 保存皮肤高亮结果
+	outputFile, err := os.Create(resultPath)
+	if err != nil {
+		panic("无法创建结果文件: " + err.Error())
+	}
+	defer outputFile.Close()
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+
+	// 保存皮肤掩码结果
+	maskFile, err := os.Create(maskPath)
+	if err != nil {
+		panic("无法创建掩码文件: " + err.Error())
+	}
+	defer maskFile.Close()
+	jpeg.Encode(maskFile, maskImg, &jpeg.Options{Quality: 95})
+
+	println("皮肤检测完成！")
+	println("结果图:", resultPath)
+	println("掩码图:", maskPath)
+	println("YCrCb阈值: Cr=[", crMin, ",", crMax, "], Cb=[", cbMin, ",", cbMax, "]")
+}
+
+// YCrCb颜色空间中的肤色阈值（适用于多数人种，可根据需求调整）
+const (
+	crMin = 133 // 红色色度最小值
+	crMax = 173 // 红色色度最大值
+	cbMin = 77  // 蓝色色度最小值
+	cbMax = 127 // 蓝色色度最大值
+)
+
+// SkinDetection 基于YCrCb的皮肤检测核心函数
+func SkinDetection(input image.Image) (image.Image, image.Image) {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 生成皮肤掩码（二值图：皮肤=白色，非皮肤=黑色）
+	mask := image.NewRGBA(bounds)
+	// 生成带皮肤高亮的结果图（皮肤保留原色，非皮肤灰色）
+	result := image.NewRGBA(bounds)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取RGB值（0-255）
+			r, g, b, a := input.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			a8 := uint8(a >> 8)
+
+			// 1. RGB转换为YCrCb
+			yVal, cr, cb := rgbToYCrCb(r8, g8, b8)
+
+			// 2. 判断是否为皮肤（Cr和Cb在阈值范围内）
+			isSkin := cr >= crMin && cr <= crMax && cb >= cbMin && cb <= cbMax
+
+			// 3. 更新掩码和结果图
+			if isSkin {
+				// 掩码：皮肤区域为白色
+				mask.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+				// 结果图：皮肤保留原色
+				result.SetRGBA(x, y, color.RGBA{r8, g8, b8, a8})
+			} else {
+				// 掩码：非皮肤区域为黑色
+				mask.SetRGBA(x, y, color.RGBA{0, 0, 0, 255})
+				// 结果图：非皮肤区域为灰色（取亮度值）
+				gray := uint8(yVal) // 用Y亮度值作为灰色
+				result.SetRGBA(x, y, color.RGBA{gray, gray, gray, a8})
+			}
+		}
+	}
+
+	// 4. 形态学后处理（去除小噪声，可选）
+	processedMask := morphCleanup(mask, width, height)
+
+	return result, processedMask
+}
+
+// RGB转YCrCb颜色空间（ITU-R BT.601标准）
+func rgbToYCrCb(r, g, b uint8) (y, cr, cb uint8) {
+	// 转换公式（RGB值范围0-255）
+	y = uint8(0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b) + 0.5)
+	cr = uint8(128 + 0.713*(float64(r)-float64(y)) + 0.5)
+	cb = uint8(128 + 0.564*(float64(b)-float64(y)) + 0.5)
+	return y, cr, cb
+}
+
+// 形态学后处理：腐蚀+膨胀去除小噪声（简单实现）
+func morphCleanup(mask image.Image, width, height int) image.Image {
+	// 腐蚀：去除孤立的小亮点（3x3窗口）
+	eroded := erode(mask, width, height)
+	// 膨胀：恢复皮肤区域的连通性
+	dilated := dilate(eroded, width, height)
+	return dilated
+}
+
+// 腐蚀操作
+func erode(mask image.Image, width, height int) image.Image {
+	result := image.NewRGBA(mask.Bounds())
+	half := 1 // 3x3窗口半宽
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 3x3窗口内是否全为皮肤（白色）
+			allSkin := true
+			for ky := -half; ky <= half; ky++ {
+				for kx := -half; kx <= half; kx++ {
+					nx := x + kx
+					ny := y + ky
+					if nx < 0 || nx >= width || ny < 0 || ny >= height {
+						allSkin = false
+						break
+					}
+					r, _, _, _ := mask.At(nx, ny).RGBA()
+					if r>>8 < 255 { // 非白色（非皮肤）
+						allSkin = false
+						break
+					}
+				}
+				if !allSkin {
+					break
+				}
+			}
+			if allSkin {
+				result.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.SetRGBA(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return result
+}
+
+// 膨胀操作
+func dilate(mask image.Image, width, height int) image.Image {
+	result := image.NewRGBA(mask.Bounds())
+	half := 1 // 3x3窗口半宽
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 3x3窗口内是否有皮肤（白色）
+			hasSkin := false
+			for ky := -half; ky <= half; ky++ {
+				for kx := -half; kx <= half; kx++ {
+					nx := x + kx
+					ny := y + ky
+					if nx < 0 || nx >= width || ny < 0 || ny >= height {
+						continue
+					}
+					r, _, _, _ := mask.At(nx, ny).RGBA()
+					if r>>8 == 255 { // 白色（皮肤）
+						hasSkin = true
+						break
+					}
+				}
+				if hasSkin {
+					break
+				}
+			}
+			if hasSkin {
+				result.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				result.SetRGBA(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return result
+}
+
 // ========================================================================
 
 // case13 基于高斯模型的肤色概率计算方法
 
+// 基于高斯模型的肤色概率计算方法通过统计肤色在特定颜色空间中的分布特性，建立概率模型来量化每个像素属于肤色的可能性。
+//与传统阈值法的 “非黑即白” 判断不同，该方法能输出连续的概率值（0-1），更适合复杂场景（如光照变化、肤色差异），是肤色检测中更鲁棒的方案。
+
+// 算法原理
+//颜色空间选择：通常使用 YCrCb 颜色空间，重点关注 Cr（红色色度）和 Cb（蓝色色度）分量（二者对肤色的区分度高，且受亮度影响小）。
+//高斯模型假设：假设肤色的 Cr 和 Cb 值服从二维正态分布（高斯分布），其概率密度函数（PDF）由均值向量（μ）和协方差矩阵（Σ）决定。
+//参数估计：通过大量肤色样本（训练集）计算 μ 和 Σ：
+//均值向量 μ = [μ_Cr, μ_Cb]（Cr 和 Cb 的样本均值）
+//协方差矩阵 Σ（描述 Cr 和 Cb 的相关性及离散程度）
+//概率计算：对输入图像的每个像素，计算其 Cr、Cb 值在该高斯模型下的概率密度，作为肤色概率（值越高，越可能是肤色）。
+
+func case13() {
+	inputPath := "test4.jpg"               // 输入图像
+	resultPath := "output_case13_skin.jpg" // 概率可视化结果
+	maskPath := "output_case13_mask.jpg"   // 二值掩码（阈值0.5）
+
+	// 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图片: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图片: " + err.Error())
+	}
+
+	// 计算肤色概率并生成结果
+	probMap, resultImg := GaussianSkinProbability(img)
+
+	// 生成二值掩码（阈值0.5，可根据需求调整）
+	maskImg := probMapToMask(probMap, img.Bounds().Max.X, img.Bounds().Max.Y, 0.5)
+
+	// 保存结果
+	outputFile, err := os.Create(resultPath)
+	if err != nil {
+		panic("无法创建结果文件: " + err.Error())
+	}
+	defer outputFile.Close()
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+
+	maskFile, err := os.Create(maskPath)
+	if err != nil {
+		panic("无法创建掩码文件: " + err.Error())
+	}
+	defer maskFile.Close()
+	jpeg.Encode(maskFile, maskImg, &jpeg.Options{Quality: 95})
+
+	println("高斯模型肤色概率计算完成！")
+	println("概率可视化结果:", resultPath)
+	println("二值掩码（阈值0.5）:", maskPath)
+}
+
+// 高斯模型参数
+type GaussianParams struct {
+	meanCr float64       // Cr分量均值
+	meanCb float64       // Cb分量均值
+	cov    [2][2]float64 // 协方差矩阵
+	covInv [2][2]float64 // 协方差矩阵的逆
+	covDet float64       // 协方差矩阵的行列式
+}
+
+// 初始化高斯模型参数
+func initGaussianParams() GaussianParams {
+	meanCr := 152.0
+	meanCb := 107.0
+
+	cov := [2][2]float64{
+		{160.0, 20.0},
+		{20.0, 140.0},
+	}
+
+	covDet := cov[0][0]*cov[1][1] - cov[0][1]*cov[1][0]
+	invDet := 1.0 / covDet
+	covInv := [2][2]float64{
+		{cov[1][1] * invDet, -cov[0][1] * invDet},
+		{-cov[1][0] * invDet, cov[0][0] * invDet},
+	}
+
+	return GaussianParams{
+		meanCr: meanCr,
+		meanCb: meanCb,
+		cov:    cov,
+		covInv: covInv,
+		covDet: covDet,
+	}
+}
+
+// 计算二维高斯分布的概率密度
+func gaussianPDF(cr, cb float64, params GaussianParams) float64 {
+	dCr := cr - params.meanCr
+	dCb := cb - params.meanCb
+
+	mahalanobis := dCr*(dCr*params.covInv[0][0]+dCb*params.covInv[0][1]) +
+		dCb*(dCr*params.covInv[1][0]+dCb*params.covInv[1][1])
+
+	normalizer := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	pdf := normalizer * math.Exp(-0.5*mahalanobis)
+
+	peakPDF := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	return pdf / peakPDF
+}
+
+// 基于高斯模型的肤色概率计算主函数（修正变量类型）
+func GaussianSkinProbability(input image.Image) (probMap [][]float64, resultImg *image.RGBA) {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	// 关键修正：将resultImg声明为具体类型*image.RGBA（而非image.Image接口）
+	resultImg = image.NewRGBA(bounds)
+
+	params := initGaussianParams()
+	probMap = make([][]float64, height)
+	for y := 0; y < height; y++ {
+		probMap[y] = make([]float64, width)
+	}
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r, g, b, a := input.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			a8 := uint8(a >> 8)
+
+			_, cr, cb := rgbToYCrCb(r8, g8, b8)
+
+			prob := gaussianPDF(float64(cr), float64(cb), params)
+			probMap[y][x] = prob
+
+			// 现在可以正常调用SetRGBA，因为resultImg是*image.RGBA类型
+			if prob > 0.5 {
+				alpha := prob
+				resultR := uint8(float64(r8)*alpha + 255*(1-alpha)*0.3)
+				resultG := uint8(float64(g8)*alpha + 255*(1-alpha)*0.3)
+				resultB := uint8(float64(b8)*alpha + 255*(1-alpha)*0.3)
+				resultImg.SetRGBA(x, y, color.RGBA{resultR, resultG, resultB, a8})
+			} else {
+				gray := uint8(50 + 155*(1-prob))
+				resultImg.SetRGBA(x, y, color.RGBA{gray, gray, gray, a8})
+			}
+		}
+	}
+
+	return probMap, resultImg
+}
+
+// 概率图转二值掩码（修正mask类型）
+func probMapToMask(probMap [][]float64, width, height int, threshold float64) *image.RGBA {
+	// 修正：返回具体类型*image.RGBA
+	mask := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if probMap[y][x] >= threshold {
+				mask.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+			} else {
+				mask.SetRGBA(x, y, color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+	return mask
+}
+
+// ========================================================================
+
+// case13_1  应用，将检测的皮肤跟换肤色，比如换成黑褐色变成黑人
+
+func case13_1() {
+	inputPath := "test4.jpg"                             // 输入图像路径
+	outputPath := "output_case13_1_darkbrown_result.jpg" // 转换结果路径
+
+	// 读取输入图像
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图片: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图片: " + err.Error())
+	}
+
+	// 执行皮肤转黑褐色处理
+	resultImg := SkinToDarkBrown(img)
+
+	// 保存结果
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+	println("皮肤转黑褐色处理完成！")
+	println("输出图片:", outputPath)
+}
+
+// 初始化高斯模型参数（通用肤色分布）
+func initGaussianParams1() GaussianParams {
+	return GaussianParams{
+		meanCr: 152.0,
+		meanCb: 107.0,
+		cov:    [2][2]float64{{160.0, 20.0}, {20.0, 140.0}},
+		covInv: [2][2]float64{{0.0063, -0.0009}, {-0.0009, 0.0071}}, // 预计算的逆矩阵
+		covDet: 160.0*140.0 - 20.0*20.0,                             // 行列式=22000
+	}
+}
+
+// 目标黑褐色（可根据需求调整深浅）
+var (
+	targetR = uint8(40) // 黑褐色红色分量
+	targetG = uint8(25) // 黑褐色绿色分量
+	targetB = uint8(15) // 黑褐色蓝色分量
+)
+
+// 计算肤色概率（基于高斯模型）
+func gaussianPDF1(cr, cb float64, params GaussianParams) float64 {
+	dCr := cr - params.meanCr
+	dCb := cb - params.meanCb
+
+	mahalanobis := dCr*(dCr*params.covInv[0][0]+dCb*params.covInv[0][1]) +
+		dCb*(dCr*params.covInv[1][0]+dCb*params.covInv[1][1])
+
+	normalizer := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	pdf := normalizer * math.Exp(-0.5*mahalanobis)
+	peakPDF := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	return pdf / peakPDF // 归一化到[0,1]
+}
+
+// 核心功能：检测皮肤并转换为黑褐色
+func SkinToDarkBrown(input image.Image) *image.RGBA {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	resultImg := image.NewRGBA(bounds)
+	params := initGaussianParams1()
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 读取原始像素值
+			r, g, b, a := input.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			a8 := uint8(a >> 8)
+
+			// 转换为YCrCb并计算肤色概率
+			_, cr, cb := rgbToYCrCb(r8, g8, b8)
+			prob := gaussianPDF1(float64(cr), float64(cb), params)
+
+			// 根据肤色概率调整颜色（概率越高，越接近黑褐色）
+			var finalR, finalG, finalB uint8
+			if prob > 0.1 { // 低概率阈值，确保弱皮肤区域也被处理
+				// 混合比例：皮肤概率越高，目标色占比越大（0.7-1.0）
+				mixRatio := math.Min(1.0, prob*1.2) // 增强转换强度
+
+				// 线性混合：原肤色与黑褐色过渡
+				finalR = uint8(float64(r8)*(1-mixRatio) + float64(targetR)*mixRatio)
+				finalG = uint8(float64(g8)*(1-mixRatio) + float64(targetG)*mixRatio)
+				finalB = uint8(float64(b8)*(1-mixRatio) + float64(targetB)*mixRatio)
+			} else {
+				// 非皮肤区域保留原色
+				finalR, finalG, finalB = r8, g8, b8
+			}
+
+			// 设置结果像素（保留Alpha通道）
+			resultImg.SetRGBA(x, y, color.RGBA{finalR, finalG, finalB, a8})
+		}
+	}
+
+	return resultImg
+}
+
+// ========================================================================
+
+// case13_2 应用，将检测的皮肤跟换肤色，比如换成黑褐色变成黑人 - 脸部阴影部分更加真实
+
+// 要让脸部阴影部分更真实，需要结合光照特性和肤色自然过渡规律：阴影区域不仅亮度更低，还会保留肤色的基础色调（不会完全失去色彩信息），
+//且阴影与高光区域的边界应平滑过渡（避免生硬断层）
+
+func case13_2() {
+	inputPath := "test4.jpg"                           // 输入图像
+	outputPath := "output_case13_2_realistic_skin.jpg" // 带真实阴影的结果
+
+	file, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图片: " + err.Error())
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		panic("无法解码图片: " + err.Error())
+	}
+
+	resultImg := FastSkinConversion(img)
+
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+
+	jpeg.Encode(outputFile, resultImg, &jpeg.Options{Quality: 95})
+	println("带真实阴影的肤色转换完成！")
+	println("输出图片:", outputPath)
+}
+
+// 高斯肤色模型参数（保持原特性）
+type GaussianParams3 struct {
+	meanCr float64       // Cr均值
+	meanCb float64       // Cb均值
+	covInv [2][2]float64 // 协方差逆矩阵
+	covDet float64       // 协方差行列式
+}
+
+// 初始化肤色模型
+func initGaussianParams3() GaussianParams3 {
+	return GaussianParams3{
+		meanCr: 145.0,
+		meanCb: 95.0,
+		covInv: [2][2]float64{{0.007, -0.001}, {-0.001, 0.008}},
+		covDet: 18000.0,
+	}
+}
+
+// 黑人肤色基准值
+var (
+	baseR = uint8(40)
+	baseG = uint8(25)
+	baseB = uint8(15)
+)
+
+// 核心参数（精简且高效）
+const (
+	shadowBrightnessThresh = 85
+	shadowDeepenRatio      = 0.25
+	smoothFactor           = 0.6
+	colorBlendPower        = 0.8
+	gaussianKernelSize     = 3 // 保持3x3核，平衡速度与效果
+	parallelBlocks         = 4 // 并行处理的图像块数量
+)
+
+// 预计算3x3高斯核（全局复用，避免重复生成）
+var gaussianKernel = [3][3]float64{
+	{0.0751, 0.1238, 0.0751},
+	{0.1238, 0.2042, 0.1238},
+	{0.0751, 0.1238, 0.0751},
+}
+
+// 核心函数：高性能肤色转换
+func FastSkinConversion(input image.Image) *image.RGBA {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	resultImg := image.NewRGBA(bounds)
+	params := initGaussianParams3()
+
+	// 1. 合并计算：一次遍历同时获取肤色概率图和平滑亮度图（减少1次完整图像遍历）
+	probMap, smoothY := precomputeProbAndSmoothY(input, width, height, params)
+
+	// 2. 并行处理初步肤色转换（按行分块，利用多核加速）
+	var wg sync.WaitGroup
+	rowsPerBlock := (height + parallelBlocks - 1) / parallelBlocks // 每块处理的行数
+	for b := 0; b < parallelBlocks; b++ {
+		startY := b * rowsPerBlock
+		endY := startY + rowsPerBlock
+		if endY > height {
+			endY = height
+		}
+		wg.Add(1)
+		go func(bStart, bEnd int) {
+			defer wg.Done()
+			// 块内处理：初步肤色转换+阴影处理
+			for y := bStart; y < bEnd; y++ {
+				for x := 0; x < width; x++ {
+					r, g, b, a := input.At(x, y).RGBA()
+					r8 := uint8(r >> 8)
+					g8 := uint8(g >> 8)
+					b8 := uint8(b >> 8)
+					a8 := uint8(a >> 8)
+
+					prob := probMap[y][x]
+					smoothYVal := smoothY[y][x]
+
+					// 非线性混合（复用预计算的probMap，避免重复计算）
+					mixRatio := 1 - math.Pow(1-prob, colorBlendPower)
+					mixRatio = math.Min(1.0, mixRatio*1.05)
+
+					// 基础肤色混合
+					finalR := uint8(float64(r8)*(1-mixRatio) + float64(baseR)*mixRatio)
+					finalG := uint8(float64(g8)*(1-mixRatio) + float64(baseG)*mixRatio)
+					finalB := uint8(float64(b8)*(1-mixRatio) + float64(baseB)*mixRatio)
+
+					// 阴影处理（精简计算逻辑）
+					if prob > 0.2 && smoothYVal < shadowBrightnessThresh {
+						shadowDepth := 1 - math.Pow(float64(smoothYVal)/shadowBrightnessThresh, 1.2)
+						deepen := shadowDepth * shadowDeepenRatio
+						finalR = uint8(float64(finalR) * (1 - deepen*0.7))
+						finalG = uint8(float64(finalG) * (1 - deepen*0.9))
+						finalB = uint8(float64(finalB) * (1 - deepen*0.85))
+					}
+
+					resultImg.SetRGBA(x, y, color.RGBA{finalR, finalG, finalB, a8})
+				}
+			}
+		}(startY, endY)
+	}
+	wg.Wait() // 等待并行处理完成
+
+	// 3. 高效高斯平滑（仅对皮肤区域，且减少边界判断）
+	smoothed := applyFastSkinSmooth(resultImg, probMap, width, height)
+
+	return smoothed
+}
+
+// 合并计算：一次遍历同时生成肤色概率图和平滑亮度图（减少图像访问次数）
+func precomputeProbAndSmoothY(img image.Image, width, height int, params GaussianParams3) ([][]float64, [][]float64) {
+	probMap := make([][]float64, height)
+	smoothY := make([][]float64, height)
+	halfKernel := gaussianKernelSize / 2
+
+	for y := 0; y < height; y++ {
+		probMap[y] = make([]float64, width)
+		smoothY[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			// 一次获取当前像素的RGB值，同时用于概率计算和亮度计算
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+			_, cr, cb := rgbToYCrCb(r8, g8, b8)
+
+			// 计算肤色概率（复用当前像素的Cr/Cb）
+			probMap[y][x] = gaussianPDF3(float64(cr), float64(cb), params)
+
+			// 计算高斯平滑亮度（预计算边界范围，减少循环内判断）
+			minX, maxX := max(0, x-halfKernel), min(width-1, x+halfKernel)
+			minY, maxY := max(0, y-halfKernel), min(height-1, y+halfKernel)
+			var weightedSum, kernelSum float64
+
+			for ky := minY; ky <= maxY; ky++ {
+				for kx := minX; kx <= maxX; kx++ {
+					// 计算核索引（避免负数，直接映射）
+					ki := ky - (y - halfKernel)
+					kj := kx - (x - halfKernel)
+					weight := gaussianKernel[ki][kj]
+
+					// 复用邻域像素的Y值计算（避免重复调用At和转换）
+					nr, ng, nb, _ := img.At(kx, ky).RGBA()
+					nyVal, _, _ := rgbToYCrCb(uint8(nr>>8), uint8(ng>>8), uint8(nb>>8))
+					weightedSum += float64(nyVal) * weight
+					kernelSum += weight
+				}
+			}
+			smoothY[y][x] = weightedSum / kernelSum
+		}
+	}
+	return probMap, smoothY
+}
+
+// 高效皮肤区域平滑（减少边界判断，复用概率图）
+func applyFastSkinSmooth(img *image.RGBA, probMap [][]float64, width, height int) *image.RGBA {
+	smoothed := image.NewRGBA(img.Bounds())
+	halfKernel := gaussianKernelSize / 2
+
+	// 并行处理平滑（再次分块加速）
+	var wg sync.WaitGroup
+	rowsPerBlock := (height + parallelBlocks - 1) / parallelBlocks
+	for b := 0; b < parallelBlocks; b++ {
+		startY := b * rowsPerBlock
+		endY := startY + rowsPerBlock
+		if endY > height {
+			endY = height
+		}
+		wg.Add(1)
+		go func(bStart, bEnd int) {
+			defer wg.Done()
+			for y := bStart; y < bEnd; y++ {
+				for x := 0; x < width; x++ {
+					prob := probMap[y][x]
+					origR, origG, origB, origA := img.At(x, y).RGBA()
+					origR8 := uint8(origR >> 8)
+					origG8 := uint8(origG >> 8)
+					origB8 := uint8(origB >> 8)
+					origA8 := uint8(origA >> 8)
+
+					if prob < 0.1 { // 非皮肤区域直接复制
+						smoothed.SetRGBA(x, y, color.RGBA{origR8, origG8, origB8, origA8})
+						continue
+					}
+
+					// 预计算邻域范围，减少循环内条件判断
+					minX, maxX := max(0, x-halfKernel), min(width-1, x+halfKernel)
+					minY, maxY := max(0, y-halfKernel), min(height-1, y+halfKernel)
+					var rSum, gSum, bSum, aSum, weightSum float64
+
+					for ky := minY; ky <= maxY; ky++ {
+						for kx := minX; kx <= maxX; kx++ {
+							nprob := probMap[ky][kx]
+							ki := ky - (y - halfKernel)
+							kj := kx - (x - halfKernel)
+							weight := gaussianKernel[ki][kj] * math.Min(prob, nprob)
+							if weight < 0.01 {
+								continue
+							}
+
+							nr, ng, nb, na := img.At(kx, ky).RGBA()
+							rSum += float64(nr>>8) * weight
+							gSum += float64(ng>>8) * weight
+							bSum += float64(nb>>8) * weight
+							aSum += float64(na>>8) * weight
+							weightSum += weight
+						}
+					}
+
+					// 混合平滑结果与原始像素（使用smoothFactor）
+					if weightSum > 0 {
+						smoothR := uint8(rSum / weightSum)
+						smoothG := uint8(gSum / weightSum)
+						smoothB := uint8(bSum / weightSum)
+						smoothA := uint8(aSum / weightSum)
+
+						finalR := uint8(float64(origR8)*(1-smoothFactor) + float64(smoothR)*smoothFactor)
+						finalG := uint8(float64(origG8)*(1-smoothFactor) + float64(smoothG)*smoothFactor)
+						finalB := uint8(float64(origB8)*(1-smoothFactor) + float64(smoothB)*smoothFactor)
+						finalA := uint8(float64(origA8)*(1-smoothFactor) + float64(smoothA)*smoothFactor)
+
+						smoothed.SetRGBA(x, y, color.RGBA{finalR, finalG, finalB, finalA})
+					} else {
+						smoothed.SetRGBA(x, y, color.RGBA{origR8, origG8, origB8, origA8})
+					}
+				}
+			}
+		}(startY, endY)
+	}
+	wg.Wait()
+
+	return smoothed
+}
+
+// 辅助函数：高斯概率计算（保持不变）
+func gaussianPDF3(cr, cb float64, params GaussianParams3) float64 {
+	dCr := cr - params.meanCr
+	dCb := cb - params.meanCb
+	mahalanobis := dCr*(dCr*params.covInv[0][0]+dCb*params.covInv[0][1]) +
+		dCb*(dCr*params.covInv[1][0]+dCb*params.covInv[1][1])
+	normalizer := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	pdf := normalizer * math.Exp(-0.5*mahalanobis)
+	peakPDF := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	return math.Min(1.0, pdf/peakPDF)
+}
+
 // ========================================================================
 
 // case14 皮肤美白算法 LUT调色法
+
+// 基于 LUT（Lookup Table，查找表）调色法的皮肤美白算法，通过预定义颜色映射关系实现高效的肤色调整：
+//先设计针对皮肤区域的亮度 / 色度映射曲线（LUT），再通过查找表快速将输入颜色映射到美白后的颜色，避免实时复杂计算，兼顾效率与自然度
+
+// 算法原理
+//颜色空间选择：使用 YCrCb 颜色空间，重点调整 Y（亮度）通道（提亮肤色），同时微调 Cr（红色色度）和 Cb（蓝色色度）通道（避免美白后肤色偏黄 / 偏红）。
+//LUT 设计：
+//Y 通道 LUT：对皮肤区域的 Y 值（亮度）设计 “低亮度大幅提亮，高亮度小幅提亮” 的非线性曲线（避免过曝）。
+//Cr/Cb 通道 LUT：轻微压低 Cr 值（减少红色感）、微调 Cb 值（保持肤色通透）。
+//非皮肤区域：LUT 设为 “输入 = 输出”，不改变原始颜色。
+//肤色掩码融合：结合肤色检测得到的概率图，按皮肤概率动态混合原始颜色与 LUT 映射颜色（概率越高，美白效果越强）
+
+func case14() {
+	inputPath := "test4.jpg"          // 输入图像路径
+	outputPath := "output_case14.jpg" // 美白结果路径
+
+	// 读取输入图像
+	inputFile, err := os.Open(inputPath)
+	if err != nil {
+		panic("无法打开输入图像: " + err.Error())
+	}
+	defer inputFile.Close()
+
+	inputImg, _, err := image.Decode(inputFile)
+	if err != nil {
+		panic("无法解码输入图像: " + err.Error())
+	}
+
+	// 执行LUT皮肤美白
+	whitenedImg := LUTSkinWhitening(inputImg)
+
+	// 保存美白结果
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic("无法创建输出文件: " + err.Error())
+	}
+	defer outputFile.Close()
+
+	// 以高质量保存JPEG
+	jpeg.Encode(outputFile, whitenedImg, &jpeg.Options{Quality: 95})
+	println("LUT皮肤美白处理完成！")
+	println("美白结果已保存至:", outputPath)
+}
+
+// 皮肤检测的高斯模型参数（用于区分皮肤区域）
+type SkinGaussianParams struct {
+	meanCr float64       // 皮肤Cr分量均值
+	meanCb float64       // 皮肤Cb分量均值
+	covInv [2][2]float64 // 协方差矩阵的逆
+	covDet float64       // 协方差矩阵的行列式
+}
+
+// 初始化皮肤检测的高斯模型参数（适配黄/白种人皮肤）
+func initSkinGaussianParams() SkinGaussianParams {
+	return SkinGaussianParams{
+		meanCr: 155.0, // 黄/白种人皮肤Cr值偏高（偏红）
+		meanCb: 100.0, // 皮肤Cb值中等
+		covInv: [2][2]float64{{0.008, -0.001}, {-0.001, 0.009}},
+		covDet: 20000.0, // 皮肤Cr/Cb分布的行列式
+	}
+}
+
+// LUT美白核心参数（控制美白效果）
+const (
+	skinWhitenIntensity = 0.7  // 美白强度（0-1，值越高美白越明显）
+	maxSkinY            = 240  // 皮肤最大亮度（避免过曝）
+	crReduceRatio       = 0.1  // Cr通道降低比例（减少红色感）
+	cbEnhanceRatio      = 0.05 // Cb通道增强比例（提升通透感）
+)
+
+// 预生成皮肤美白的LUT（查找表）：启动时计算，加速实时处理
+var (
+	skinYWhiteningLUT [256]uint8 // Y通道（亮度）美白映射表
+	skinCrAdjustLUT   [256]uint8 // Cr通道（红色度）调整表
+	skinCbAdjustLUT   [256]uint8 // Cb通道（蓝色度）调整表
+)
+
+// 初始化LUT表（程序启动时执行，预计算颜色映射关系）
+func init() {
+	// 1. Y通道LUT：低亮度皮肤大幅提亮，高亮度皮肤小幅提亮（非线性美白）
+	for y := 0; y < 256; y++ {
+		// 非线性因子：暗部（y小）提亮多，亮部（y大）提亮少，避免高光过曝
+		nonlinearFactor := 1.0 - math.Pow(float64(y)/255.0, 2)
+		// 计算美白后的亮度：原始亮度 + 可提升空间 * 强度 * 非线性因子
+		whitenedY := float64(y) + (maxSkinY-float64(y))*skinWhitenIntensity*nonlinearFactor
+		if whitenedY > maxSkinY {
+			whitenedY = maxSkinY // 限制最大亮度，防止过曝
+		}
+		skinYWhiteningLUT[y] = uint8(whitenedY)
+	}
+
+	// 2. Cr通道LUT：降低红色度（避免美白后皮肤偏红）
+	for cr := 0; cr < 256; cr++ {
+		adjustedCr := float64(cr) * (1 - crReduceRatio*skinWhitenIntensity)
+		skinCrAdjustLUT[cr] = clampColor(adjustedCr)
+	}
+
+	// 3. Cb通道LUT：轻微提升蓝色度（增加皮肤通透感）
+	for cb := 0; cb < 256; cb++ {
+		adjustedCb := float64(cb) * (1 + cbEnhanceRatio*skinWhitenIntensity)
+		skinCbAdjustLUT[cb] = clampColor(adjustedCb)
+	}
+}
+
+// 核心函数：基于LUT的皮肤美白主流程
+func LUTSkinWhitening(input image.Image) *image.RGBA {
+	bounds := input.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+	resultImg := image.NewRGBA(bounds)
+	skinGaussian := initSkinGaussianParams()
+
+	// 1. 预计算皮肤概率图（每个像素属于皮肤的概率，0-1）
+	skinProbMap := precomputeSkinProbMap(input, width, height, skinGaussian)
+
+	// 2. 并行处理图像（按行分块，利用多核加速）
+	var wg sync.WaitGroup
+	rowsPerBlock := (height + 3) / 4 // 分成4块并行处理
+	for block := 0; block < 4; block++ {
+		startY := block * rowsPerBlock
+		endY := startY + rowsPerBlock
+		if endY > height {
+			endY = height
+		}
+		wg.Add(1)
+		go func(blockStartY, blockEndY int) {
+			defer wg.Done()
+			processImageBlock(input, resultImg, skinProbMap, blockStartY, blockEndY, width)
+		}(startY, endY)
+	}
+	wg.Wait() // 等待所有块处理完成
+
+	return resultImg
+}
+
+// 预计算皮肤概率图（区分皮肤和非皮肤区域）
+func precomputeSkinProbMap(img image.Image, width, height int, gaussian SkinGaussianParams) [][]float64 {
+	skinProbMap := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		skinProbMap[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			// 转换为YCrCb，提取Cr/Cb用于皮肤概率计算
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
+			_, cr, cb := rgbToYCrCbForSkin(r8, g8, b8)
+			// 计算当前像素的皮肤概率
+			skinProbMap[y][x] = skinGaussianProbability(float64(cr), float64(cb), gaussian)
+		}
+	}
+	return skinProbMap
+}
+
+// 处理单个图像块（应用LUT美白）
+func processImageBlock(input image.Image, result *image.RGBA, skinProbMap [][]float64, startY, endY, width int) {
+	for y := startY; y < endY; y++ {
+		for x := 0; x < width; x++ {
+			// 读取原始像素并转换为YCrCb
+			r, g, b, a := input.At(x, y).RGBA()
+			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
+			a8 := uint8(a >> 8)
+			yVal, cr, cb := rgbToYCrCbForSkin(r8, g8, b8)
+
+			// 获取当前像素的皮肤概率（0-1）
+			skinProb := skinProbMap[y][x]
+
+			// 按皮肤概率混合：原始值与LUT美白值
+			// Y通道（亮度）：美白核心，权重随皮肤概率变化
+			whitenedY := skinYWhiteningLUT[yVal]
+			finalY := blendBySkinProb(yVal, whitenedY, skinProb)
+
+			// Cr通道（红色度）：轻微调整，权重低于亮度
+			adjustedCr := skinCrAdjustLUT[cr]
+			finalCr := blendBySkinProb(cr, adjustedCr, skinProb*0.8)
+
+			// Cb通道（蓝色度）：微调通透感，权重最低
+			adjustedCb := skinCbAdjustLUT[cb]
+			finalCb := blendBySkinProb(cb, adjustedCb, skinProb*0.5)
+
+			// 转换回RGB并写入结果
+			finalR, finalG, finalB := yCrCbToRGBForSkin(finalY, finalCr, finalCb)
+			result.SetRGBA(x, y, color.RGBA{finalR, finalG, finalB, a8})
+		}
+	}
+}
+
+// 计算皮肤的高斯概率（判断像素是否为皮肤）
+func skinGaussianProbability(cr, cb float64, params SkinGaussianParams) float64 {
+	dCr := cr - params.meanCr // Cr与均值的偏差
+	dCb := cb - params.meanCb // Cb与均值的偏差
+	// 计算马氏距离的平方（衡量与皮肤分布的偏离程度）
+	mahalanobisDistSq := dCr*(dCr*params.covInv[0][0]+dCb*params.covInv[0][1]) +
+		dCb*(dCr*params.covInv[1][0]+dCb*params.covInv[1][1])
+	// 高斯概率密度公式
+	normalizer := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	probDensity := normalizer * math.Exp(-0.5*mahalanobisDistSq)
+	// 归一化到[0,1]范围
+	peakDensity := 1.0 / (2 * math.Pi * math.Sqrt(params.covDet))
+	return math.Min(1.0, probDensity/peakDensity)
+}
+
+// 按皮肤概率混合两个颜色值（原始值与调整值）
+func blendBySkinProb(original, adjusted uint8, skinProb float64) uint8 {
+	return uint8(float64(original)*(1-skinProb) + float64(adjusted)*skinProb)
+}
+
+// 将颜色值限制在[0,255]范围内
+func clampColor(value float64) uint8 {
+	if value < 0 {
+		return 0
+	}
+	if value > 255 {
+		return 255
+	}
+	return uint8(value + 0.5) // 四舍五入
+}
+
+// RGB转YCrCb（用于皮肤处理的颜色空间转换）
+func rgbToYCrCbForSkin(r, g, b uint8) (y, cr, cb uint8) {
+	y = uint8(0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b) + 0.5)
+	cr = uint8(128 + 0.713*(float64(r)-float64(y)) + 0.5)
+	cb = uint8(128 + 0.564*(float64(b)-float64(y)) + 0.5)
+	return y, cr, cb
+}
+
+// YCrCb转RGB（皮肤处理后转回显示用的RGB）
+func yCrCbToRGBForSkin(y, cr, cb uint8) (r, g, b uint8) {
+	yFloat := float64(y)
+	crFloat := float64(cr) - 128.0 // 还原Cr偏移
+	cbFloat := float64(cb) - 128.0 // 还原Cb偏移
+
+	// 转换公式（确保在有效范围）
+	r = clampColor(yFloat + 1.403*crFloat)
+	g = clampColor(yFloat - 0.344*cbFloat - 0.714*crFloat)
+	b = clampColor(yFloat + 1.773*cbFloat)
+	return r, g, b
+}
 
 // ========================================================================
 
@@ -2310,21 +3307,5 @@ func wmClamp(val uint8, min, max uint8) uint8 {
 // ========================================================================
 
 // case28 L-G算子处理
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
-
-// ========================================================================
 
 // ========================================================================
