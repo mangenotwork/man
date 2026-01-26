@@ -110,7 +110,106 @@ func main() {
 //图像复原方法卡尔曼滤波法
 //图像复原方法传播波方程恢复法
 //几何绘制 直线，曲线，正方形，圆形，三角形，梯形，多边形
+//均值迭代阈值分割法
+//最大类间方差分割法
+//自适应阈值分割法
+//最大熵分割法
+//区域生长算法
+//区域分裂合并算法
+//主动轮廓模型
+//水平集方法
+//彩色图像的平滑
+//RGB空间分割
+//向量梯度计算
+//图像傅里叶变换
+//图像余弦变换
+//图像求反
+//频谱平移
+//余弦变换逆变换
+//图像傅里叶变换逆变换
+
+// 《数字图像融合算法分析与应用》
+//基于小波的多聚焦图像融合算法 - 小波变换
+//离散小波变换的快速算法
+//小波域多聚焦图像融合算法
+//基于轮廓波的多聚焦图像融合算法
+//轮廓波变换
+//复轮廓波变换
+//向导滤波
+//基于轮廓波变换图像融合算法
+//基于剪切波和Smoothlet的多聚焦图像融合
+//图像复原正则化方法
+//RGB分量提取
+//RGB分量提取统计图
+//彩色图像的CLAHE处理
+//基于暗通道的图像去雾
+//角点检测
+//SIFT检测算法
+//CSIFT检测算法
+//ASIFT检测算法
+//SURF检测算法
+//霍夫变换法
+//最小二乘法
+//仿射变换
+//几何失真校正
+//直方图均衡化
+//空域滤波
+//线性平滑滤波器
+//线性锐化滤波器
+//非线性平滑滤波器
+//非线性锐化滤波器
+//带阻带通滤波器
+//同态滤波器
+//逆滤波图像恢复
+//维纳滤波器
+//图像小尺度修复示例：去除文字
+//图像大尺度修复示例：去除景物
+//超分辨率复原
+//傅里叶反变换重建法
+//梯度图
+//拉普拉斯图
+//分水岭算法分割
+//围绕区域-外接盒
+//彩色图像的R、G、B和H、S、I各分量图
+//彩色切割增强
+//彩色滤波增强
+//假彩色增强
+//粗化
+//巴特沃斯低通滤波器（Butterworth low-pass filter）
+//巴特沃斯高通滤波器（Butterworth high-pass filter）
+//巴特沃斯陷波带阻滤波器（Butterworth notch reject filter）
+//非线性均值滤波器（nonlinear mean filter）
+//非线性平滑滤波器（non-linear smoothing filter）
+//非线性锐化滤波器（non-linear sharpening filter）
+//傅里叶变换对（Fourier transform pair）
+//傅里叶变换投影定理（projection theorem for Fourier transform）
+//傅里叶反变换重建法（reconstruction by Fourier inversion）
+//傅里叶频谱（Fourier spectrum）
+//高帽变换（top-hat transformation）
+//高频提升滤波（high-boost filtering）
+//高频提升滤波器（high-boost filter）
+//高频增强滤波（high frequency emphasis filtering）
+//高频增强滤波器（high frequency emphasis filter）
+//高斯低通滤波器（Gaussian low-pass filter）
+//高斯高通滤波器（Gaussian high-pass filter）
+//高斯混合模型（Gaussian mixture model）
+//高斯加权平滑函数（Gaussian weighted smooth function）
+//高斯-拉普拉斯滤波器（Laplacian-of-Gaussian filter）
+//高斯陷波带阻滤波器（Gaussian notch reject filter）
+//高斯噪声（Gaussian noise）
+//高通滤波（high-pass filtering）
+//哥伦布码（Colomb code）
+//格雷码（Gray code）
+//理想低通滤波器（ideal low-pass filter）
+//理想高通滤波器（ideal high-pass filter）
+//理想陷波带通滤波器（ideal notch pass filter）
+//理想陷波带阻滤波器（ideal notch reject filter）
+//文字适应纹理
 
 // 知识
 
 // 大范围  图像处理: 图像采集，图像增强，图像复原，形态学处理，图像分割，目标识别，表达描述，图像压缩，彩色化处理
+
+// 支持图像格式   jpg  bmp  tiff  png  实现格式转换
+
+// 图像格式   灰度图  索引图  二值图  RGB图
