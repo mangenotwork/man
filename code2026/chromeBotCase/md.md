@@ -105,6 +105,22 @@ for i=0; i<list.length; i++ {
 chrome close # 关闭当前chrome的进程
 ```
 
+例子4  最终形态，输入文本让AI能理解后转化为 例子3 
+```
+打开浏览器到"https://www.doubao.com/chat/"
+list [
+"介绍一下golang",
+"给安装教程",
+"写一段能运行的代码"
+]
+将list循环执行操作
+输入 //textarea[@data-testid='chat_input_input'] list[i] 
+点击 //*[@id='flow-end-msg-send']
+循环等待检查10次 "//div[contains(@class, 'send-btn-wrapper') and (contains(@class, '!hidden'))]" 如何是true则跳出循环，附加如果是第9次都不为true则超时
+遇到超时，跳出list循环
+关闭浏览器
+```
+
 
 ```python
 var keywordMap = map[string]struct{}{
