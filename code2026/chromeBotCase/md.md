@@ -18,6 +18,7 @@ chrome init  # 重新初始化chrome，电脑新打开chrome
 table https://www.baidu.com  # 在第一个table页输入百度的链接
 input //*[@id="chat-textarea"] "github"  # 在Xpath定位出输入 github
 click Search("百度一下")  # 在页面搜索"百度一下"文本定位位置，搜索到了点击
+let result = ""
 collect //div[@class="result"] to result.DelHtml.Save("./result.txt")  # 提取页面定位的Xpath保存到x,x执行删除HTMl标签然后保存到./result.txt
 ```
 
@@ -32,8 +33,77 @@ collect //div[@class="result"] to result.DelHtml.Save("./result.txt")  # 提取�
 - let 定义变量  类型有字符串,数值类型,布尔类型
 - if true, false, 支持运算 >,<,=,!= 条件判断
 - for 循环 i=0, i<10, i++  {} 内是循环体
+- break 退出循环
+- continue 跳过本次循环
 - to  将页面的html赋予给变量
 - check 检查浏览器上的Xpath, 后面第一个参数跟Xpath定位，返回true或false
+- fn 定义函数 存在return值
+- print 在控制台输出
+- list [] 数组类型
+- exit 
+
+
+
+例子2
+``` baidu_case2.cas 打开百度输入github点击百度一下，然后点击页面的列表然后再返回再点击
+chrome init 
+
+# 定义进入github搜索页
+fn inGithub() {
+	table https://www.baidu.com  # 在第一个table页输入百度的链接
+    input //*[@id="chat-textarea"] "github"  # 在Xpath定位出输入 github
+    click Search("百度一下")  # 在页面搜索"百度一下"文本定位位置，搜索到了点击
+}
+
+# 定义列表上点击子项
+fn clickItem(i) bool {
+	click //div[@class="result"][%d] i # 点击每一个
+	stop 5s  # 休息5s
+	let a = check //title
+	table CallBack # 执行退回上一个页面 
+	return a
+}
+
+# 执行
+inGithub()
+for i=1; i<10; i++ {
+   if clickItem(i) == false {
+       print("第%d个没有title",i)
+   }
+}
+
+```
+
+例子3 打开豆包问问题
+```
+chrome init 
+table "https://www.doubao.com/chat/"
+list [
+"介绍一下golang",
+"给安装教程",
+"写一段能运行的代码"
+]
+for i=0; i<list.length; i++ {
+    input //textarea[@data-testid='chat_input_input'] list[i]
+    click //*[@id='flow-end-msg-send']
+    let x = false
+    for i=0; i<10; i++ {
+        if check "//div[contains(@class, 'send-btn-wrapper') and (contains(@class, '!hidden'))]" { # 检查是否还在回复
+            break
+        }
+        if i==9 { # 检查超时了，这种情况一般是网络不稳定或ai出现一直循环回复
+            print("超时")
+            x = true
+        }
+    }
+    stop 1s  # 休息1s
+    if x == true {
+       print("中间等待回复的时候超时了，结束本次循环")
+       break
+    }
+}
+chrome close # 关闭当前chrome的进程
+```
 
 
 ```python
