@@ -1,3 +1,5 @@
+===================  第一版本 草案
+
 实现解析器
 
 规则
@@ -156,5 +158,42 @@ input chat-textarea-Xpath inputTxt
 click Search(sName)
 collect //div[@class="result"] to result.DelHtml.Save("./result.txt")
 ```
+
+
+===================  第二版本 草案
+
+基于 AST 实现，内置封装了很多方法，语法要简单，不能太像编程语言，没有过多的语法，完全过程化编程，专注于流程，表达清楚为目标
+
+1. 支持变量以及算数运算
+2. 支持逻辑判断
+3. 支持循环
+4. 内置关键词
+5. 变量值如果是字符类型必须双引号
+6. 注释为 #
+7. 支持变量类型 数值类型，字符串，数组，bool类型
+8. 支持很多内置函数方法
+9. 支持函数链式调用
+10. 
+
+例子1 
+```
+let url = "https://www.baidu.com" 
+chrome init # 重新初始化chrome，电脑新打开chrome
+let ciList = ["github", "ai", "golang"] # 定义一个数组
+for i=0;i<Len(ciList);i++ { # 循环这个数组
+    table 1 open url # 在第一个table页输入百度的链接
+    input "//*[@id="chat-textarea"]" ciList[i]   # 在Xpath定位出输入 数据
+    click SearchXpath("百度一下")   # 在页面搜索"百度一下"文本定位位置，搜索到了点击
+    if CheckXpath("//div[@class="result"]") { # 判断是否存在这个Xpath
+        log("找到数据并保存到 ./result.txt")
+        collect "//div[@class="result"]" to x.DelHtml().Save(Str("./result_%s.txt",ciList[i])) # 提取页面定位的Xpath保存到x,x执行删除HTMl标签然后保存到./result.txt
+    } else {
+        log(Str("%s没有找到数据", ciList[i]))
+    }
+    stop 1s # 停止1s
+}
+chrome close # 关闭浏览器
+```
+
 
 
