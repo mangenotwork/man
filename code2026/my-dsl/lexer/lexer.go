@@ -1,5 +1,10 @@
-// lexer/lexer.go
 package lexer
+
+/*
+
+词法分析
+
+*/
 
 import (
 	"log"

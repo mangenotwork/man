@@ -1,5 +1,10 @@
-// ast/ast.go
 package ast
+
+/*
+
+AST
+
+*/
 
 import (
 	"fmt"

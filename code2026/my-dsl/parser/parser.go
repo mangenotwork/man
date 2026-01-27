@@ -1,11 +1,17 @@
-// parser/parser.go
 package parser
+
+import "my-dsl/lexer"
+
+/*
+
+语法分析
+
+*/
 
 import (
 	"fmt"
 	"log"
 	"my-dsl/ast"
-	"my-dsl/lexer"
 	"strconv"
 )
 

@@ -1,5 +1,10 @@
-// builtins/builtins.go
 package builtins
+
+/*
+
+内置函数注册器
+
+*/
 
 import (
 	"fmt"

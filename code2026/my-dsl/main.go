@@ -104,6 +104,8 @@ while i < 3 {
 // 调用你的Go工具函数
 log_info("i = ", i);
 
+log_info(now())
+
 `
 
 	fmt.Println("执行示例脚本:")

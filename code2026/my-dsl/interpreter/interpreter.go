@@ -1,5 +1,10 @@
-// interpreter/interpreter.go
 package interpreter
+
+/*
+
+解释器
+
+*/
 
 import (
 	"fmt"
