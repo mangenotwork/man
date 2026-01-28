@@ -60,6 +60,8 @@ const (
 	TokenTrue
 	TokenFalse
 	TokenChrome
+	TokenBreak
+	TokenContinue
 )
 
 var tokenTypeStrings = map[TokenType]string{
@@ -99,6 +101,8 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenTrue:      "true",
 	TokenFalse:     "false",
 	TokenChrome:    "chrome",
+	TokenBreak:     "break",
+	TokenContinue:  "continue",
 }
 
 func (t TokenType) String() string {
@@ -422,6 +426,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return TokenFalse
 	case "chrome":
 		return TokenChrome
+	case "break":
+		return TokenBreak
+	case "continue":
+		return TokenContinue
 	default:
 		return TokenIdent
 	}

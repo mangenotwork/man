@@ -116,14 +116,32 @@ log_info(now())
 	runScript(script)
 }
 
+/*
+
+case1 : chrome语句
+chrome init prot=123 proty="127.0.0.1"
+
+case 2 : 注释
+// chrome init prot=123
+# 1231 chrome init prot=123 proty="127.0.0.1"
+
+
+*/
+
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-// chrome init prot=123
-# 1231 chrome init prot=123 proty="127.0.0.1"
-chrome init prot=123 proty="127.0.0.1"
+var i = 0;
+while i < 5 {
+   
+    i = i + 1;
+	if i == 2 {
+		print("i==2 跳过循序")
+		continue
+	}
+ 	print("循环次数:", i);
+}
 `
-
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")
 	runScript(script)

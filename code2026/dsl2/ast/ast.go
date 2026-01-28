@@ -228,6 +228,24 @@ func (w *WhileStmt) String() string {
 }
 func (w *WhileStmt) stmtNode() {}
 
+// BreakStmt break 语句
+type BreakStmt struct {
+	StartPos Position
+}
+
+func (b *BreakStmt) Pos() Position  { return b.StartPos }
+func (b *BreakStmt) String() string { return "break" }
+func (b *BreakStmt) stmtNode()      {}
+
+// ContinueStmt continue 语句
+type ContinueStmt struct {
+	StartPos Position
+}
+
+func (c *ContinueStmt) Pos() Position  { return c.StartPos }
+func (c *ContinueStmt) String() string { return "continue" }
+func (c *ContinueStmt) stmtNode()      {}
+
 // 返回语句
 type ReturnStmt struct {
 	StartPos Position

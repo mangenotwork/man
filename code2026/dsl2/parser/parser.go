@@ -154,6 +154,10 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseBlockStatement()
 	case lexer.TokenChrome:
 		return p.parseChromeStatement()
+	case lexer.TokenBreak:
+		return p.parseBreakStatement()
+	case lexer.TokenContinue:
+		return p.parseContinueStatement()
 	default:
 		return p.parseSimpleStatement()
 	}
@@ -395,6 +399,68 @@ func (p *Parser) parseWhileStatement() *ast.WhileStmt {
 	stmt.Body = p.parseBlockStatement()
 	if stmt.Body == nil {
 		return nil
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseBreakStatement() *ast.BreakStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	log.Println("parseBreakStatement = ", p.curTok)
+
+	p.enter()
+	defer p.leave()
+
+	stmt := &ast.BreakStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+	}
+
+	// 跳过 break
+	p.nextToken()
+
+	// 期待分号
+	//if !p.curTokenIs(lexer.TokenSemicolon) {
+	//	p.errors = append(p.errors, "break语句后缺少分号")
+	//	return nil
+	//}
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		p.nextToken() // 跳过 ;
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseContinueStatement() *ast.ContinueStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	stmt := &ast.ContinueStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+	}
+
+	// 跳过 continue
+	p.nextToken()
+
+	// 期待分号
+	//if !p.curTokenIs(lexer.TokenSemicolon) {
+	//	p.errors = append(p.errors, "continue语句后缺少分号")
+	//	return nil
+	//}
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		p.nextToken() // 跳过 ;
 	}
 
 	return stmt
