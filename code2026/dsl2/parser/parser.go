@@ -158,6 +158,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseBreakStatement()
 	case lexer.TokenContinue:
 		return p.parseContinueStatement()
+	case lexer.TokenFor:
+		return p.parseForStatement()
 	default:
 		return p.parseSimpleStatement()
 	}
@@ -464,6 +466,338 @@ func (p *Parser) parseContinueStatement() *ast.ContinueStmt {
 	}
 
 	return stmt
+}
+
+// 单个循环能正常，但是嵌套循环存在问题
+func (p *Parser) parseForStatement_old() *ast.ForStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	stmt := &ast.ForStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+	}
+
+	// 跳过 for
+	p.expect(lexer.TokenFor, "for语句")
+
+	// 先检查最简单的两种情况
+	// 情况1: for { ... } 无限循环
+	if p.curTokenIs(lexer.TokenLBrace) {
+		stmt.Body = p.parseBlockStatement()
+		return stmt
+	}
+
+	// 情况2: for condition { ... } (类似 while)
+	// 保存当前位置以便回溯
+	// 由于我们没有保存位置，我们需要一种不同的方法
+	// 我们可以先尝试解析表达式，然后检查它后面是什么
+
+	// 首先尝试解析一个语句（可能是初始化）
+	initStmt := p.parseInitStatement()
+
+	if initStmt == nil {
+		// 如果没有初始化语句，检查是否是分号
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			// 是分号，说明是标准 for 循环但没有初始化
+			stmt.Init = nil
+			p.nextToken() // 跳过第一个分号
+		} else {
+			// 不是分号，尝试解析条件表达式
+			// 这可能是 for condition { ... } 形式
+			cond := p.parseExpression()
+			if cond == nil {
+				p.errors = append(p.errors, "for语句解析错误")
+				return nil
+			}
+
+			// 检查下一个 token
+			if p.curTokenIs(lexer.TokenLBrace) {
+				// 是 {，说明是 for condition { ... } 形式
+				stmt.Cond = cond
+				stmt.Body = p.parseBlockStatement()
+				return stmt
+			} else if p.curTokenIs(lexer.TokenSemicolon) {
+				// 是分号，说明是标准 for 循环但没有初始化
+				stmt.Cond = cond
+				p.nextToken() // 跳过分号
+				// 继续解析标准 for 循环
+			} else {
+				p.errors = append(p.errors, "for语句语法错误")
+				return nil
+			}
+		}
+	} else {
+		// 有初始化语句
+		stmt.Init = initStmt
+
+		// 检查下一个 token
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			// 是分号，标准 for 循环
+			p.nextToken() // 跳过分号
+		} else if p.curTokenIs(lexer.TokenLBrace) {
+			// 是 {，说明是 for init { ... } 形式
+			// 这里 init 可能是条件表达式
+			// 我们需要重新判断
+			// 更安全的方式是：如果 init 是表达式语句，且后面是 {，则应该作为条件
+			if exprStmt, ok := initStmt.(*ast.ExpressionStmt); ok {
+				// 这其实是条件表达式
+				stmt.Init = nil
+				stmt.Cond = exprStmt.Expr
+				stmt.Body = p.parseBlockStatement()
+				return stmt
+			}
+		} else {
+			p.errors = append(p.errors, "for语句期望分号或左大括号")
+			return nil
+		}
+	}
+
+	// 解析初始化部分
+	// 可能有三种情况：
+	// 1. 有分号：for (; i < 10; i++)
+	// 2. 有初始化语句：for (var i = 0; i < 10; i++)
+	// 3. 没有初始化：for (i < 10) { ... } (类似 while)
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		// 没有初始化语句
+		stmt.Init = nil
+		p.nextToken() // 跳过第一个分号
+	} else {
+		// 解析初始化语句
+		stmt.Init = p.parseInitStatement()
+		if stmt.Init == nil && !p.curTokenIs(lexer.TokenSemicolon) {
+			p.errors = append(p.errors, "for语句初始化部分解析错误")
+			return nil
+		}
+
+		// 期待分号
+		//if !p.expect(lexer.TokenSemicolon, "分号") {
+		//	return nil
+		//}
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			p.nextToken() // 跳过 ;
+		}
+	}
+
+	// 解析条件部分
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		// 没有条件表达式，相当于 true
+		stmt.Cond = nil
+		p.nextToken() // 跳过第二个分号
+	} else {
+		// 解析条件表达式
+		stmt.Cond = p.parseExpression()
+
+		// 期待分号
+		//if !p.expect(lexer.TokenSemicolon, "分号") {
+		//	return nil
+		//}
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			p.nextToken() // 跳过 ;
+		}
+	}
+
+	// 解析后置部分
+	if p.curTokenIs(lexer.TokenLBrace) {
+		// 没有后置语句
+		stmt.Post = nil
+	} else {
+		// 解析后置语句
+		stmt.Post = p.parsePostStatement()
+		if stmt.Post == nil && !p.curTokenIs(lexer.TokenLBrace) {
+			p.errors = append(p.errors, "for语句后置部分解析错误")
+			return nil
+		}
+	}
+
+	// 解析循环体
+	stmt.Body = p.parseBlockStatement()
+	if stmt.Body == nil {
+		return nil
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseForStatement() *ast.ForStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	stmt := &ast.ForStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+	}
+
+	// 跳过 for
+	if !p.expect(lexer.TokenFor, "for") {
+		return nil
+	}
+
+	// 情况1: for { ... } 无限循环
+	if p.curTokenIs(lexer.TokenLBrace) {
+		stmt.Body = p.parseBlockStatement()
+		return stmt
+	}
+
+	// 先尝试解析第一个部分
+	// 它可能是：
+	// 1. var 声明 (for var i = 0; ...)
+	// 2. 表达式 (for i < 5; ... 或 for i = 0; ...)
+	// 3. 分号 (for ; ...)
+
+	// 检查是否是 var 声明
+	if p.curTokenIs(lexer.TokenVar) {
+		// 情况: for var i = 0; i < 5; i++
+		stmt.Init = p.parseInitStatement() // 解析 var 声明
+
+		//// 必须跟分号
+		//if !p.curTokenIs(lexer.TokenSemicolon) {
+		//	p.errors = append(p.errors, "for语句期望分号")
+		//	return nil
+		//}
+		//p.nextToken() // 跳过分号
+
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			p.nextToken() // 跳过 ;
+		}
+
+		// 继续解析剩余部分
+		return p.parseForRemaining(stmt)
+	} else if p.curTokenIs(lexer.TokenSemicolon) {
+		// 情况: for ; i < 5; i++
+		p.nextToken() // 跳过分号
+		return p.parseForRemaining(stmt)
+	} else {
+		// 尝试解析为表达式
+		// 这可能是：
+		// 1. 条件表达式: for i < 5 { ... }
+		// 2. 赋值表达式: for i = 0; i < 5; i++
+
+		// 保存当前位置以便回溯
+		// 由于不能直接回溯，我们需要先解析表达式，然后判断
+		expr := p.parseExpression()
+		if expr == nil {
+			p.errors = append(p.errors, "for语句解析错误")
+			return nil
+		}
+
+		// 检查下一个 token
+		if p.curTokenIs(lexer.TokenLBrace) {
+			// 表达式后面是 {，说明是 for condition { ... } 形式
+			stmt.Cond = expr
+			stmt.Body = p.parseBlockStatement()
+			return stmt
+		} else if p.curTokenIs(lexer.TokenSemicolon) {
+			// 表达式后面是分号，说明是标准 for 循环
+			stmt.Init = &ast.ExpressionStmt{Expr: expr}
+			p.nextToken() // 跳过分号
+			return p.parseForRemaining(stmt)
+		} else {
+			p.errors = append(p.errors, fmt.Sprintf("for语句语法错误，期望 '{' 或 ';'，得到: %s", p.curTok.Literal))
+			return nil
+		}
+	}
+}
+
+// 解析 for 循环的剩余部分（条件和后置）
+func (p *Parser) parseForRemaining(stmt *ast.ForStmt) *ast.ForStmt {
+	// 解析条件部分
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		// 没有条件
+		p.nextToken() // 跳过分号
+	} else {
+		stmt.Cond = p.parseExpression()
+		if stmt.Cond == nil {
+			p.errors = append(p.errors, "for语句条件解析错误")
+			return nil
+		}
+
+		//if !p.expect(lexer.TokenSemicolon, "分号") {
+		//	return nil
+		//}
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			p.nextToken() // 跳过 ;
+		}
+	}
+
+	// 解析后置部分
+	if !p.curTokenIs(lexer.TokenLBrace) {
+		stmt.Post = p.parsePostStatement()
+		if stmt.Post == nil {
+			p.errors = append(p.errors, "for语句后置部分解析错误")
+			return nil
+		}
+	}
+
+	// 解析循环体
+	stmt.Body = p.parseBlockStatement()
+	if stmt.Body == nil {
+		return nil
+	}
+
+	return stmt
+}
+
+// 解析 for 循环的初始化语句
+func (p *Parser) parseInitStatement() ast.Statement {
+	// 如果直接是分号，表示没有初始化语句
+	if p.curTokenIs(lexer.TokenSemicolon) {
+		return nil
+	}
+
+	// 可能是 var 声明
+	if p.curTokenIs(lexer.TokenVar) {
+		return p.parseVarStatement()
+	}
+
+	// 保存当前 token 以便回溯
+	saveTok := p.curTok
+	// 尝试解析为表达式语句
+	expr := p.parseExpression()
+	if expr == nil {
+		// 解析失败，恢复保存的 token
+		p.curTok = saveTok
+		return nil
+	}
+
+	// 检查是否是赋值表达式
+	switch expr.(type) {
+	case *ast.Identifier:
+		// 只是一个标识符，可能是赋值语句的一部分
+		// 检查下一个 token
+		if p.curTokenIs(lexer.TokenAssign) {
+			// 恢复并解析为赋值语句
+			p.curTok = saveTok
+			return p.parseSimpleStatement() // .parseAssignStmt()
+		}
+		// 否则，只是一个表达式语句
+		return &ast.ExpressionStmt{Expr: expr}
+	default:
+		// 其他表达式
+		return &ast.ExpressionStmt{Expr: expr}
+	}
+}
+
+// 解析 for 循环的后置语句
+func (p *Parser) parsePostStatement() ast.Statement {
+	if p.curTokenIs(lexer.TokenLBrace) || p.curTokenIs(lexer.TokenRParen) {
+		return nil
+	}
+
+	// 解析表达式语句
+	return p.parseSimpleStatement()
 }
 
 func (p *Parser) parseReturnStatement() *ast.ReturnStmt {

@@ -125,22 +125,74 @@ case 2 : 注释
 // chrome init prot=123
 # 1231 chrome init prot=123 proty="127.0.0.1"
 
+case 3 : for 循环
 
+for var i = 0; i < 5; i = i + 1 {
+    print("i =", i);
+}
+
+for var i = 0; i < 5; i = i + 1 {
+	if i == 2 {
+		print("i == 2  continue ");
+		continue
+	}
+ 	print("i =", i);
+}
+
+for var i = 0; i < 5; i = i + 1 {
+	if i == 2 {
+		print("i == 2  break ");
+		break
+	}
+ 	print("i =", i);
+}
+
+var i = 0;
+for i < 5 {
+    print("i =", i);
+    i = i + 1;
+}
+
+var i = 0;
+for {
+    if i >= 5 {
+        break;
+    }
+    print("i =", i);
+    i = i + 1;
+}
+
+for var i = 0; i < 3; i = i + 1 {
+    for var j = 0; j < 3; j = j + 1 {
+        if i == 1 && j == 1 {
+            print("跳过 i=1,j=1");
+            continue;
+        }
+        print("i =", i, "j =", j);
+    }
+}
+
+case 4 : 变量
+var a1 = 1
+print("a1 = ", a1)
+var a2 = "aaa"
+print("a2 = ", a2)
+var a3 = true
+print("a3 = ", a3)
+var a4 = [1,2,3]
+print("a4 = ", a4)
+var a5 = ["aa", "bb", "cc"]
+print("a5 ", a5)
+for var i = 0; i < 5; i = i + 1 {
+	print("item ", a5[i])
+}
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-var i = 0;
-while i < 5 {
-   
-    i = i + 1;
-	if i == 2 {
-		print("i==2 跳过循序")
-		continue
-	}
- 	print("循环次数:", i);
-}
+	var a4 = [1,2,3]
+	print("a4 = ", a4)
 `
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")

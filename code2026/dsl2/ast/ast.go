@@ -260,3 +260,32 @@ func (r *ReturnStmt) String() string {
 	return "return"
 }
 func (r *ReturnStmt) stmtNode() {}
+
+type ForStmt struct {
+	StartPos Position
+	Init     Statement  // 初始化语句，可以为 nil
+	Cond     Expression // 条件表达式，可以为 nil
+	Post     Statement  // 后置语句，可以为 nil
+	Body     *BlockStmt
+}
+
+func (f *ForStmt) Pos() Position { return f.StartPos }
+func (f *ForStmt) String() string {
+	initStr := ""
+	if f.Init != nil {
+		initStr = f.Init.String()
+	}
+
+	condStr := ""
+	if f.Cond != nil {
+		condStr = f.Cond.String()
+	}
+
+	postStr := ""
+	if f.Post != nil {
+		postStr = f.Post.String()
+	}
+
+	return fmt.Sprintf("for %s; %s; %s %s", initStr, condStr, postStr, f.Body.String())
+}
+func (f *ForStmt) stmtNode() {}

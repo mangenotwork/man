@@ -135,6 +135,8 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 	case *ast.ContinueStmt:
 		ctx.hasContinue = true
 		return nil
+	case *ast.ForStmt:
+		return i.evaluateForStmt(s, ctx, hang)
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
 		os.Exit(0)
@@ -437,6 +439,63 @@ func (i *Interpreter) evaluateWhileStmt(stmt *ast.WhileStmt, ctx *Context, hang 
 			continue
 		}
 
+	}
+
+	return nil
+}
+
+func (i *Interpreter) evaluateForStmt(stmt *ast.ForStmt, ctx *Context, hang int) Value {
+	// 1. 执行初始化语句
+	if stmt.Init != nil {
+		_ = i.evaluateStmt(stmt.Init, ctx, hang)
+		if ctx.hasReturn || ctx.hasBreak || ctx.hasContinue {
+			return nil
+		}
+	}
+
+	// 2. 循环主体
+	for {
+		// 2.1 检查循环条件
+		if stmt.Cond != nil {
+			condition := i.evaluateExpr(stmt.Cond, ctx, hang)
+			if !i.bool(condition) {
+				break
+			}
+		}
+		// 如果没有条件表达式，相当于条件永远为 true
+
+		// 2.2 执行循环体
+		for _, stmt := range stmt.Body.Stmts {
+			_ = i.evaluateStmt(stmt, ctx, hang)
+
+			// 检查控制流
+			if ctx.hasReturn {
+				return *ctx.returnVal
+			}
+			if ctx.hasBreak {
+				ctx.hasBreak = false
+				return nil
+			}
+			if ctx.hasContinue {
+				ctx.hasContinue = false
+				break
+			}
+		}
+
+		// 如果是 continue，直接执行后置语句
+		if ctx.hasContinue {
+			ctx.hasContinue = false
+		}
+
+		// 2.3 执行后置语句
+		if stmt.Post != nil {
+			_ = i.evaluateStmt(stmt.Post, ctx, hang)
+			if ctx.hasReturn || ctx.hasBreak || ctx.hasContinue {
+				return nil
+			}
+		}
+
+		// 如果遇到 break，已经在上面的检查中返回
 	}
 
 	return nil

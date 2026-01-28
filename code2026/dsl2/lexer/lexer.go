@@ -62,6 +62,7 @@ const (
 	TokenChrome
 	TokenBreak
 	TokenContinue
+	TokenFor
 )
 
 var tokenTypeStrings = map[TokenType]string{
@@ -103,6 +104,7 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenChrome:    "chrome",
 	TokenBreak:     "break",
 	TokenContinue:  "continue",
+	TokenFor:       "for",
 }
 
 func (t TokenType) String() string {
@@ -430,6 +432,8 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return TokenBreak
 	case "continue":
 		return TokenContinue
+	case "for":
+		return TokenFor
 	default:
 		return TokenIdent
 	}
