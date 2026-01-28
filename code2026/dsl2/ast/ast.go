@@ -93,7 +93,7 @@ func (b *Boolean) Pos() Position  { return b.StartPos }
 func (b *Boolean) String() string { return fmt.Sprintf("%v", b.Value) }
 func (b *Boolean) exprNode()      {}
 
-// 表达式节点
+// BinaryExpr 表达式节点
 type BinaryExpr struct {
 	StartPos Position
 	Left     Expression
@@ -107,6 +107,7 @@ func (b *BinaryExpr) String() string {
 }
 func (b *BinaryExpr) exprNode() {}
 
+// UnaryExpr 一元表达式
 type UnaryExpr struct {
 	StartPos Position
 	Op       string
@@ -119,7 +120,7 @@ func (u *UnaryExpr) String() string {
 }
 func (u *UnaryExpr) exprNode() {}
 
-// 函数调用
+// CallExpr 函数调用
 type CallExpr struct {
 	StartPos Position
 	Function *Identifier
@@ -136,7 +137,7 @@ func (c *CallExpr) String() string {
 }
 func (c *CallExpr) exprNode() {}
 
-// 赋值语句
+// AssignStmt 赋值语句
 type AssignStmt struct {
 	StartPos Position
 	Left     *Identifier
@@ -149,7 +150,7 @@ func (a *AssignStmt) String() string {
 }
 func (a *AssignStmt) stmtNode() {}
 
-// 变量声明
+// VarDecl 变量声明
 type VarDecl struct {
 	StartPos Position
 	Name     *Identifier
@@ -166,23 +167,7 @@ func (v *VarDecl) String() string {
 }
 func (v *VarDecl) stmtNode() {}
 
-// chrome
-type ChromeStmt struct {
-	StartPos Position
-	Args     []Expression
-}
-
-func (c *ChromeStmt) Pos() Position { return c.StartPos }
-func (c *ChromeStmt) String() string {
-	args := make([]string, len(c.Args))
-	for i, arg := range c.Args {
-		args[i] = arg.String()
-	}
-	return fmt.Sprintf("Chrome %s ", strings.Join(args, " "))
-}
-func (c *ChromeStmt) stmtNode() {}
-
-// 块语句
+// BlockStmt 块语句
 type BlockStmt struct {
 	StartPos Position
 	Stmts    []Statement
@@ -198,7 +183,7 @@ func (b *BlockStmt) String() string {
 }
 func (b *BlockStmt) stmtNode() {}
 
-// 控制流
+// IfStmt 控制流
 type IfStmt struct {
 	StartPos  Position
 	Condition Expression
@@ -216,6 +201,7 @@ func (i *IfStmt) String() string {
 }
 func (i *IfStmt) stmtNode() {}
 
+// WhileStmt While循环
 type WhileStmt struct {
 	StartPos  Position
 	Condition Expression
@@ -246,7 +232,7 @@ func (c *ContinueStmt) Pos() Position  { return c.StartPos }
 func (c *ContinueStmt) String() string { return "continue" }
 func (c *ContinueStmt) stmtNode()      {}
 
-// 返回语句
+// ReturnStmt 返回语句
 type ReturnStmt struct {
 	StartPos Position
 	Expr     Expression
@@ -261,6 +247,7 @@ func (r *ReturnStmt) String() string {
 }
 func (r *ReturnStmt) stmtNode() {}
 
+// ForStmt for循环
 type ForStmt struct {
 	StartPos Position
 	Init     Statement  // 初始化语句，可以为 nil
@@ -289,3 +276,19 @@ func (f *ForStmt) String() string {
 	return fmt.Sprintf("for %s; %s; %s %s", initStr, condStr, postStr, f.Body.String())
 }
 func (f *ForStmt) stmtNode() {}
+
+// ChromeStmt chrome 关键字，操作chrome
+type ChromeStmt struct {
+	StartPos Position
+	Args     []Expression
+}
+
+func (c *ChromeStmt) Pos() Position { return c.StartPos }
+func (c *ChromeStmt) String() string {
+	args := make([]string, len(c.Args))
+	for i, arg := range c.Args {
+		args[i] = arg.String()
+	}
+	return fmt.Sprintf("Chrome %s ", strings.Join(args, " "))
+}
+func (c *ChromeStmt) stmtNode() {}

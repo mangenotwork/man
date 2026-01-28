@@ -129,7 +129,6 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 	case *ast.ChromeStmt:
 		return i.evaluateChromeStmt(s, ctx, hang)
 	case *ast.BreakStmt:
-		log.Println("*********** 检查到 BreakStmt")
 		ctx.hasBreak = true
 		return nil
 	case *ast.ContinueStmt:
@@ -140,8 +139,6 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
 		os.Exit(0)
-		//i.errors = append(i.errors, fmt.Errorf("不支持的语句类型: %T", stmt))
-		//return nil
 	}
 	return nil
 }
@@ -165,8 +162,6 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 		}
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("未定义的变量: %s", e.Name))
 		os.Exit(0)
-		//i.errors = append(i.errors, fmt.Errorf("未定义的变量: %s", e.Name))
-		//return nil
 	case *ast.BinaryExpr:
 		log.Println("evaluateExpr ast.BinaryExpr ==> ", e)
 		return i.evaluateBinaryExpr(e, ctx, hang)
@@ -181,8 +176,6 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
 		os.Exit(0)
-		//i.errors = append(i.errors, fmt.Errorf("不支持的表达式类型: %T", expr))
-		//return nil
 	}
 	return nil
 }
@@ -345,16 +338,6 @@ func (i *Interpreter) evaluateBlockStmt(block *ast.BlockStmt, ctx *Context, hang
 		}
 	}
 
-	//for _, stmt := range block.Stmts {
-	//	_ = i.evaluateStmt(stmt, newCtx, hang) // 忽略返回值
-	//
-	//	if newCtx.hasReturn {
-	//		ctx.hasReturn = true
-	//		ctx.returnVal = newCtx.returnVal
-	//		return *ctx.returnVal
-	//	}
-	//}
-
 	return nil
 }
 
@@ -409,33 +392,12 @@ func (i *Interpreter) evaluateWhileStmt(stmt *ast.WhileStmt, ctx *Context, hang 
 			break
 		}
 
-		//// 为循环体创建新上下文
-		//loopCtx := NewContext(ctx)
-		//// 执行循环体
-		//for _, stmt := range stmt.Body.Stmts {
-		//	_ = i.evaluateStmt(stmt, loopCtx, hang)
-		//
-		//	if loopCtx.hasReturn {
-		//		ctx.hasReturn = true
-		//		ctx.returnVal = loopCtx.returnVal
-		//		return *ctx.returnVal
-		//	}
-		//}
-
-		//// 关键：从循环体作用域传播变量到父作用域
-		//for k, v := range loopCtx.variables {
-		//	if _, ok := ctx.GetVar(k); ok {
-		//		ctx.SetVar(k, v)
-		//	}
-		//}
-
 		// 如果父作用域中本来没有这个变量，但现在有了，也要设置
 		for k, v := range loopCtx.variables {
 			ctx.SetVar(k, v) // 直接设置，覆盖原有的值
 		}
 
 		if loopCtx.hasContinue {
-			// continue 就继续下一次循环
 			continue
 		}
 
@@ -465,8 +427,8 @@ func (i *Interpreter) evaluateForStmt(stmt *ast.ForStmt, ctx *Context, hang int)
 		// 如果没有条件表达式，相当于条件永远为 true
 
 		// 2.2 执行循环体
-		for _, stmt := range stmt.Body.Stmts {
-			_ = i.evaluateStmt(stmt, ctx, hang)
+		for _, stmtItem := range stmt.Body.Stmts {
+			_ = i.evaluateStmt(stmtItem, ctx, hang)
 
 			// 检查控制流
 			if ctx.hasReturn {

@@ -15,6 +15,11 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		// 如果没有参数，使用示例脚本
+
+		//log.Println("所有示例测试")
+		//runExample()
+		//log.Println("所有示例测试完成 .......")
+
 		runExample2()
 		return
 	}
@@ -71,44 +76,69 @@ func runScript(source string) {
 func runExample() {
 	// 一个简单的示例脚本
 	script := `
-print("aaaaa")
-// 变量声明
-var count = 10
-var name = "World"
-var is_active = true;
+#case1 : chrome语句
+chrome init prot=123 proty="127.0.0.1"
 
-// 函数调用
-print("Hello, " + name + "!")
-print("Count:", count)
+var c = 2
 
-// 条件语句
-if count > 5 {
-    print("Count 大于 5");
-} else {
-    print("Count 小于等于 5")
+#case 2 : 注释
+// chrome init prot=123
+# 1231 chrome init prot=123 proty="127.0.0.1"
+
+#case 3 : for 循环
+
+for var i = 0; i < 5; i = i + 1 {
+    print("i =", i);
 }
 
-if is_active {
-	print("is_active");
+for var i = 0; i < 5; i = i + 1 {
+	if i == 2 {
+		print("i == 2  continue ");
+		continue
+	}
+ 	print("i =", i);
 }
 
-// 算数运算
-var a = 2 + 1;
-print("a:", a);
+for var i = 0; i < 5; i = i + 1 {
+	if i == 2 {
+		print("i == 2  break ");
+		break
+	}
+ 	print("i =", i);
+}
 
-// 循环
 var i = 0;
-while i < 3 {
-    print("循环次数:", i);
+for i < 5 {
+    print("i =", i);
     i = i + 1;
-	break;
 }
 
-// 调用你的Go工具函数
-log_info("i = ", i);
+var i = 0;
+for {
+    if i >= 5 {
+        break;
+    }
+    print("i =", i);
+    i = i + 1;
+}
 
-log_info(now())
+for var i = 0; i < 3; i = i + 1 {
+    for var j = 0; j < 3; j = j + 1 {
+        if i == 1 && j == 1 {
+            print("跳过 i=1,j=1");
+            continue;
+        }
+        print("i =", i, "j =", j);
+    }
+}
 
+#case 4 : 变量
+var a1 = 1
+print("a1 = ", a1)
+var a2 = "aaa"
+print("a2 = ", a2)
+var a3 = true
+print("a3 = ", a3)
 `
 
 	fmt.Println("执行示例脚本:")
@@ -191,8 +221,10 @@ for var i = 0; i < 5; i = i + 1 {
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-	var a4 = [1,2,3]
-	print("a4 = ", a4)
+chrome init prot=123 proty="127.0.0.1"
+
+var c = 2
+print(c)
 `
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")

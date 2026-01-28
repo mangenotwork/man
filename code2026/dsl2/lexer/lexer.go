@@ -186,10 +186,6 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = TokenEQ
 			tok.Literal = "=="
 		} else {
-			//log.Println("TokenAssign")
-			//tok.Type = TokenAssign
-			//tok.Literal = string(l.ch)
-
 			// 检查前面是否有标识符
 			// 如果前面是标识符字符，则 = 应该属于标识符的一部分
 			if l.position > 0 && (isLetter(rune(l.input[l.position-1])) || isDigit(rune(l.input[l.position-1])) ||
@@ -339,9 +335,6 @@ func (l *Lexer) skipComment() {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	//for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
-	//	l.readChar()
-	//}
 
 	for {
 		// 允许的字符：字母、数字、下划线、等号、点、冒号、减号
