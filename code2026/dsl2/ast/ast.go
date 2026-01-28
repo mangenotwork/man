@@ -292,3 +292,32 @@ func (c *ChromeStmt) String() string {
 	return fmt.Sprintf("Chrome %s ", strings.Join(args, " "))
 }
 func (c *ChromeStmt) stmtNode() {}
+
+// List 列表字面量
+type List struct {
+	StartPos Position
+	Elements []Expression
+}
+
+func (l *List) Pos() Position { return l.StartPos }
+func (l *List) String() string {
+	elements := make([]string, len(l.Elements))
+	for i, elem := range l.Elements {
+		elements[i] = elem.String()
+	}
+	return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
+}
+func (l *List) exprNode() {}
+
+// IndexExpr 下标表达式
+type IndexExpr struct {
+	StartPos Position
+	Left     Expression
+	Index    Expression
+}
+
+func (i *IndexExpr) Pos() Position { return i.StartPos }
+func (i *IndexExpr) String() string {
+	return fmt.Sprintf("%s[%s]", i.Left.String(), i.Index.String())
+}
+func (i *IndexExpr) exprNode() {}

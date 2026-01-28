@@ -937,7 +937,8 @@ func (p *Parser) parseUnary() ast.Expression {
 		}
 	}
 
-	return p.parsePrimary()
+	// 修改这里，让 parseUnary 调用 parseCallOrIndex
+	return p.parseCallOrIndex()
 }
 
 func (p *Parser) parsePrimary() ast.Expression {
@@ -961,6 +962,8 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return p.parseBoolean()
 	case lexer.TokenLParen:
 		return p.parseGroupedExpression()
+	case lexer.TokenLBracket: // 添加列表字面量解析
+		return p.parseListLiteral()
 	default:
 
 		errStr := fmt.Sprintf("第%d行第%d列: 期望表达式，得到: %s",
@@ -987,58 +990,7 @@ func (p *Parser) parseIdentifierOrCall() ast.Expression {
 
 	p.nextToken()
 
-	// 检查是否是函数调用
-	if p.curTokenIs(lexer.TokenLParen) {
-		p.nextToken() // 跳过 (
-
-		var args []ast.Expression
-
-		// 解析参数列表
-		if !p.curTokenIs(lexer.TokenRParen) {
-			for {
-
-				// 解析参数
-				arg := p.parseExpression()
-				log.Println("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
-				if arg != nil {
-					args = append(args, arg)
-				} else {
-					// 参数解析失败
-					break
-				}
-				//log.Println(p.curTok.Type)
-				// 检查是否有更多参数
-				if p.curTokenIs(lexer.TokenComma) {
-					p.nextToken() // 跳过逗号
-					continue
-				}
-
-				break
-			}
-		}
-
-		// 期望右括号
-		if !p.expect(lexer.TokenRParen, "函数调用参数列表后") {
-			return nil
-		}
-
-		return &ast.CallExpr{
-			StartPos: ast.Position{
-				Line:   line,
-				Column: column,
-			},
-			Function: &ast.Identifier{
-				StartPos: ast.Position{
-					Line:   line,
-					Column: column,
-				},
-				Name: name,
-			},
-			Args: args,
-		}
-	}
-
-	// 不是函数调用，返回标识符
+	// 现在只返回标识符，调用和下标在 parsePostfix 中处理
 	return &ast.Identifier{
 		StartPos: ast.Position{
 			Line:   line,
@@ -1046,6 +998,66 @@ func (p *Parser) parseIdentifierOrCall() ast.Expression {
 		},
 		Name: name,
 	}
+
+	//// 检查是否是函数调用
+	//if p.curTokenIs(lexer.TokenLParen) {
+	//	p.nextToken() // 跳过 (
+	//
+	//	var args []ast.Expression
+	//
+	//	// 解析参数列表
+	//	if !p.curTokenIs(lexer.TokenRParen) {
+	//		for {
+	//
+	//			// 解析参数
+	//			arg := p.parseExpression()
+	//			log.Println("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
+	//			if arg != nil {
+	//				args = append(args, arg)
+	//			} else {
+	//				// 参数解析失败
+	//				break
+	//			}
+	//			//log.Println(p.curTok.Type)
+	//			// 检查是否有更多参数
+	//			if p.curTokenIs(lexer.TokenComma) {
+	//				p.nextToken() // 跳过逗号
+	//				continue
+	//			}
+	//
+	//			break
+	//		}
+	//	}
+	//
+	//	// 期望右括号
+	//	if !p.expect(lexer.TokenRParen, "函数调用参数列表后") {
+	//		return nil
+	//	}
+	//
+	//	return &ast.CallExpr{
+	//		StartPos: ast.Position{
+	//			Line:   line,
+	//			Column: column,
+	//		},
+	//		Function: &ast.Identifier{
+	//			StartPos: ast.Position{
+	//				Line:   line,
+	//				Column: column,
+	//			},
+	//			Name: name,
+	//		},
+	//		Args: args,
+	//	}
+	//}
+	//
+	//// 不是函数调用，返回标识符
+	//return &ast.Identifier{
+	//	StartPos: ast.Position{
+	//		Line:   line,
+	//		Column: column,
+	//	},
+	//	Name: name,
+	//}
 }
 
 func (p *Parser) parseInteger() ast.Expression {
@@ -1129,4 +1141,186 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	expr := p.parseExpression()
 	p.expect(lexer.TokenRParen, "分组表达式结束")
 	return expr
+}
+
+func (p *Parser) parseListLiteral() *ast.List {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	list := &ast.List{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+	}
+
+	p.nextToken() // 跳过 [
+
+	// 解析列表元素
+	if !p.curTokenIs(lexer.TokenRBracket) {
+		for {
+			// 解析元素
+			element := p.parseExpression()
+			if element != nil {
+				list.Elements = append(list.Elements, element)
+			} else {
+				// 元素解析失败
+				p.errors = append(p.errors, "列表元素解析失败")
+				return nil
+			}
+
+			// 检查是否有更多元素
+			if p.curTokenIs(lexer.TokenComma) {
+				p.nextToken() // 跳过逗号
+				continue
+			}
+
+			break
+		}
+	}
+
+	// 期望右括号
+	if !p.expect(lexer.TokenRBracket, "列表字面量后") {
+		return nil
+	}
+
+	return list
+}
+
+func (p *Parser) parseCallOrIndex() ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 先解析基本表达式
+	expr := p.parsePrimary()
+	if expr == nil {
+		return nil
+	}
+
+	// 处理后续的调用或下标
+	return p.parsePostfix(expr)
+}
+
+func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
+	if !p.checkDepth() {
+		return expr
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 循环处理多个下标或调用
+	for {
+		switch p.curTok.Type {
+		case lexer.TokenLParen:
+			// 函数调用
+			expr = p.parseCall(expr)
+		case lexer.TokenLBracket:
+			// 下标表达式
+			expr = p.parseIndex(expr)
+		default:
+			// 既不是调用也不是下标，返回当前表达式
+			return expr
+		}
+	}
+}
+
+func (p *Parser) parseCall(left ast.Expression) ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 检查左边是否是标识符
+	ident, ok := left.(*ast.Identifier)
+	if !ok {
+		p.errors = append(p.errors, "函数调用必须是标识符")
+		return nil
+	}
+
+	p.nextToken() // 跳过 (
+
+	var args []ast.Expression
+
+	// 解析参数列表
+	if !p.curTokenIs(lexer.TokenRParen) {
+		for {
+			// 解析参数
+			arg := p.parseExpression()
+			log.Println("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
+			if arg != nil {
+				args = append(args, arg)
+			} else {
+				// 参数解析失败
+				break
+			}
+			//log.Println(p.curTok.Type)
+			// 检查是否有更多参数
+			if p.curTokenIs(lexer.TokenComma) {
+				p.nextToken() // 跳过逗号
+				continue
+			}
+
+			break
+		}
+	}
+
+	// 期望右括号
+	if !p.expect(lexer.TokenRParen, "函数调用参数列表后") {
+		return nil
+	}
+
+	return &ast.CallExpr{
+		StartPos: ast.Position{
+			Line:   ident.StartPos.Line,
+			Column: ident.StartPos.Column,
+		},
+		Function: ident,
+		Args:     args,
+	}
+}
+
+func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 保存左表达式的位置
+	pos := ast.Position{
+		Line:   p.curTok.Line,
+		Column: p.curTok.Column,
+	}
+
+	p.nextToken() // 跳过 [
+
+	// 解析下标表达式
+	indexExpr := p.parseExpression()
+	if indexExpr == nil {
+		p.errors = append(p.errors, "下标表达式解析失败")
+		return nil
+	}
+
+	// 期望右括号
+	if !p.expect(lexer.TokenRBracket, "下标表达式后") {
+		return nil
+	}
+
+	return &ast.IndexExpr{
+		StartPos: pos,
+		Left:     left,
+		Index:    indexExpr,
+	}
 }

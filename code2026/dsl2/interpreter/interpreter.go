@@ -173,6 +173,14 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 		log.Println("evaluateExpr ast.CallExpr ==> ", e)
 		return i.evaluateCallExpr(e, ctx, hang)
 
+	case *ast.List: // 添加列表字面量求值
+		log.Println("evaluateExpr ast.List ==> ", e)
+		return i.evaluateList(e, ctx, hang)
+
+	case *ast.IndexExpr: // 添加下标表达式求值
+		log.Println("evaluateExpr ast.IndexExpr ==> ", e)
+		return i.evaluateIndexExpr(e, ctx, hang)
+
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
 		os.Exit(0)
@@ -512,6 +520,23 @@ func (i *Interpreter) add(left, right Value) Value {
 		}
 	case string:
 		return fmt.Sprintf("%s%v", l, right)
+
+	case []Value: // 列表加法（连接）
+		switch r := right.(type) {
+		case []Value:
+			// 连接两个列表
+			result := make([]Value, len(l)+len(r))
+			copy(result, l)
+			copy(result[len(l):], r)
+			return result
+		default:
+			// 将其他值添加到列表末尾
+			result := make([]Value, len(l)+1)
+			copy(result, l)
+			result[len(l)] = r
+			return result
+		}
+
 	}
 
 	i.errors = append(i.errors, fmt.Errorf("不支持的操作: %T + %T", left, right))
@@ -632,9 +657,43 @@ func (i *Interpreter) mod(left, right Value) Value {
 }
 
 func (i *Interpreter) equal(left, right Value) bool {
+	// 如果是列表，需要深度比较
+	if l, ok := left.([]Value); ok {
+		if r, ok := right.([]Value); ok {
+			if len(l) != len(r) {
+				return false
+			}
+			for idx := 0; idx < len(l); idx++ {
+				if !i.valuesEqual(l[idx], r[idx]) { // 使用辅助函数比较元素
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
 	return reflect.DeepEqual(left, right)
 }
 
+// 添加辅助函数
+func (i *Interpreter) valuesEqual(left, right Value) bool {
+	// 递归处理嵌套列表
+	if l, ok := left.([]Value); ok {
+		if r, ok := right.([]Value); ok {
+			if len(l) != len(r) {
+				return false
+			}
+			for idx := 0; idx < len(l); idx++ {
+				if !i.valuesEqual(l[idx], r[idx]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+	return reflect.DeepEqual(left, right)
+}
 func (i *Interpreter) less(left, right Value) bool {
 	switch l := left.(type) {
 	case int64:
@@ -746,8 +805,48 @@ func (i *Interpreter) registerBuiltins() {
 		switch v := args[0].(type) {
 		case string:
 			return int64(len(v)), nil
+		case []Value: // 添加对列表的支持
+			return int64(len(v)), nil
 		default:
 			return nil, fmt.Errorf("len() 不支持的类型: %T", args[0])
 		}
 	})
+}
+
+func (i *Interpreter) evaluateList(list *ast.List, ctx *Context, hang int) Value {
+	elements := make([]Value, len(list.Elements))
+	for idx, element := range list.Elements {
+		elements[idx] = i.evaluateExpr(element, ctx, hang)
+	}
+	return elements
+}
+
+func (i *Interpreter) evaluateIndexExpr(expr *ast.IndexExpr, ctx *Context, hang int) Value {
+	// 求值左边的表达式（应该是列表）
+	left := i.evaluateExpr(expr.Left, ctx, hang)
+
+	// 求值下标
+	index := i.evaluateExpr(expr.Index, ctx, hang)
+
+	// 检查左边是否是列表
+	list, ok := left.([]Value)
+	if !ok {
+		i.errors = append(i.errors, fmt.Errorf("下标操作只支持列表，得到: %T", left))
+		return nil
+	}
+
+	// 检查下标是否是整数
+	idx, ok := index.(int64)
+	if !ok {
+		i.errors = append(i.errors, fmt.Errorf("列表下标必须是整数，得到: %T", index))
+		return nil
+	}
+
+	// 检查下标是否越界
+	if idx < 0 || idx >= int64(len(list)) {
+		i.errors = append(i.errors, fmt.Errorf("列表下标越界: 长度=%d, 下标=%d", len(list), idx))
+		return nil
+	}
+
+	return list[idx]
 }

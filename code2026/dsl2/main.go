@@ -216,15 +216,75 @@ print("a5 ", a5)
 for var i = 0; i < 5; i = i + 1 {
 	print("item ", a5[i])
 }
+
+case 5 列表 list
+var list1 = [1, 2, 3]
+var list2 = ["a", "b", "c"]
+print("list1 = ", list1)
+print("list2 = ", list2)
+var first = list1[0]  // 1
+var second = list2[1] // "b"
+print("first = ", first)
+print("second = ", second)
+
+var length = len(list1)
+print("length = ", length)
+
+var i = 0
+while i < len(list1) {
+    print("list i = ", i, " 值: ", list1[i])
+    i = i + 1
+}
+
+var combined = list1 + list2  // [1, 2, 3, "a", "b", "c"]
+print("combined = ", combined)
+
+if [1, 2] == [1, 2] {
+    print("列表相等")
+}
+
+var matrix = [[1, 2], [3, 4]]
+print("matrix = ", matrix)
+var element = matrix[0][1]
+print("element = ", element)
+
+
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-chrome init prot=123 proty="127.0.0.1"
+var list1 = [1, 2, 3]
+var list2 = ["a", "b", "c"]
+print("list1 = ", list1)
+print("list2 = ", list2)
+var first = list1[0]  // 1
+var second = list2[1] // "b"
+print("first = ", first)
+print("second = ", second)
 
-var c = 2
-print(c)
+var length = len(list1)  
+print("length = ", length)
+
+var i = 0
+while i < len(list1) {
+    print("list i = ", i, " 值: ", list1[i])
+    i = i + 1
+}
+
+var combined = list1 + list2  // [1, 2, 3, "a", "b", "c"]
+print("combined = ", combined)
+
+if [1, 2] == [1, 2] {
+    print("列表相等")
+}
+
+var matrix = [[1, 2], [3, 4]]
+print("matrix = ", matrix)
+var element = matrix[0][1]
+print("element = ", element)
+
+
 `
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")
