@@ -185,7 +185,10 @@ func (p *Parser) parseSimpleStatement() ast.Statement {
 
 	// 检查是否是赋值
 	if p.curTokenIs(lexer.TokenAssign) {
-		if ident, ok := expr.(*ast.Identifier); ok {
+		// 检查左边是否是标识符或下标表达式
+		switch left := expr.(type) {
+		case *ast.Identifier:
+			// 普通变量赋值
 			p.nextToken() // 跳过 =
 			right := p.parseExpression()
 			if right == nil {
@@ -197,7 +200,7 @@ func (p *Parser) parseSimpleStatement() ast.Statement {
 					Line:   line,
 					Column: column,
 				},
-				Left: ident,
+				Left: left,
 				Expr: right,
 			}
 
@@ -206,9 +209,33 @@ func (p *Parser) parseSimpleStatement() ast.Statement {
 				p.nextToken() // 跳过 ;
 			}
 			return stmt
-		} else {
+
+		case *ast.IndexExpr:
+			// 字典或列表元素赋值
+			p.nextToken() // 跳过 =
+			right := p.parseExpression()
+			if right == nil {
+				return nil
+			}
+
+			stmt := &ast.IndexAssignStmt{
+				StartPos: ast.Position{
+					Line:   line,
+					Column: column,
+				},
+				Target: left,
+				Expr:   right,
+			}
+
+			// 跳过分号
+			if p.curTokenIs(lexer.TokenSemicolon) {
+				p.nextToken() // 跳过 ;
+			}
+			return stmt
+
+		default:
 			p.errors = append(p.errors,
-				fmt.Sprintf("第%d行第%d列: 赋值目标必须是标识符", line, column))
+				fmt.Sprintf("第%d行第%d列: 赋值目标必须是标识符或下标表达式", line, column))
 			return nil
 		}
 	}
@@ -964,6 +991,8 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return p.parseGroupedExpression()
 	case lexer.TokenLBracket: // 添加列表字面量解析
 		return p.parseListLiteral()
+	case lexer.TokenLBrace: // 字典字面量
+		return p.parseDictLiteral()
 	default:
 
 		errStr := fmt.Sprintf("第%d行第%d列: 期望表达式，得到: %s",
@@ -1323,4 +1352,65 @@ func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 		Left:     left,
 		Index:    indexExpr,
 	}
+}
+
+func (p *Parser) parseDictLiteral() *ast.Dict {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	dict := &ast.Dict{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		Pairs: make(map[ast.Expression]ast.Expression),
+	}
+
+	p.nextToken() // 跳过 {
+
+	// 解析字典键值对
+	if !p.curTokenIs(lexer.TokenRBrace) {
+		for {
+			// 解析键
+			key := p.parseExpression()
+			if key == nil {
+				p.errors = append(p.errors, "字典键解析失败")
+				return nil
+			}
+
+			// 期望冒号
+			if !p.expect(lexer.TokenColon, "字典键后") {
+				return nil
+			}
+
+			// 解析值
+			value := p.parseExpression()
+			if value == nil {
+				p.errors = append(p.errors, "字典值解析失败")
+				return nil
+			}
+
+			// 将键值对添加到字典
+			dict.Pairs[key] = value
+
+			// 检查是否有更多键值对
+			if p.curTokenIs(lexer.TokenComma) {
+				p.nextToken() // 跳过逗号
+				continue
+			}
+
+			break
+		}
+	}
+
+	// 期望右花括号
+	if !p.expect(lexer.TokenRBrace, "字典字面量后") {
+		return nil
+	}
+
+	return dict
 }

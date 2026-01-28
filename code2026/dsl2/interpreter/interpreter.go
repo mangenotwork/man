@@ -17,6 +17,9 @@ import (
 // Value 值接口
 type Value interface{}
 
+// DictType 字典类型
+type DictType map[Value]Value
+
 // Function 函数定义
 type Function func(args []Value) (Value, error)
 
@@ -136,6 +139,8 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 		return nil
 	case *ast.ForStmt:
 		return i.evaluateForStmt(s, ctx, hang)
+	case *ast.IndexAssignStmt: // 添加下标赋值处理
+		return i.evaluateIndexAssignStmt(s, ctx, hang)
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
 		os.Exit(0)
@@ -180,6 +185,10 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 	case *ast.IndexExpr: // 添加下标表达式求值
 		log.Println("evaluateExpr ast.IndexExpr ==> ", e)
 		return i.evaluateIndexExpr(e, ctx, hang)
+
+	case *ast.Dict: // 添加字典字面量求值
+		log.Println("evaluateExpr ast.Dict ==> ", e)
+		return i.evaluateDict(e, ctx, hang)
 
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
@@ -537,6 +546,21 @@ func (i *Interpreter) add(left, right Value) Value {
 			return result
 		}
 
+	case DictType: // 字典合并
+		switch r := right.(type) {
+		case DictType:
+			// 合并两个字典
+			result := make(DictType)
+			// 先复制左边字典的所有元素
+			for k, v := range l {
+				result[k] = v
+			}
+			// 然后复制右边字典的所有元素（右边的会覆盖左边的）
+			for k, v := range r {
+				result[k] = v
+			}
+			return result
+		}
 	}
 
 	i.errors = append(i.errors, fmt.Errorf("不支持的操作: %T + %T", left, right))
@@ -677,8 +701,9 @@ func (i *Interpreter) equal(left, right Value) bool {
 
 // 添加辅助函数
 func (i *Interpreter) valuesEqual(left, right Value) bool {
-	// 递归处理嵌套列表
-	if l, ok := left.([]Value); ok {
+	// 递归处理嵌套列表和字典
+	switch l := left.(type) {
+	case []Value: // 列表
 		if r, ok := right.([]Value); ok {
 			if len(l) != len(r) {
 				return false
@@ -691,8 +716,28 @@ func (i *Interpreter) valuesEqual(left, right Value) bool {
 			return true
 		}
 		return false
+
+	case DictType: // 字典
+		if r, ok := right.(DictType); ok {
+			if len(l) != len(r) {
+				return false
+			}
+			for key, lval := range l {
+				if rval, exists := r[key]; exists {
+					if !i.valuesEqual(lval, rval) {
+						return false
+					}
+				} else {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+
+	default:
+		return reflect.DeepEqual(left, right)
 	}
-	return reflect.DeepEqual(left, right)
 }
 func (i *Interpreter) less(left, right Value) bool {
 	switch l := left.(type) {
@@ -807,9 +852,101 @@ func (i *Interpreter) registerBuiltins() {
 			return int64(len(v)), nil
 		case []Value: // 添加对列表的支持
 			return int64(len(v)), nil
+		case DictType: // 字典
+			return int64(len(v)), nil
 		default:
 			return nil, fmt.Errorf("len() 不支持的类型: %T", args[0])
 		}
+	})
+
+	// 字典的 keys
+	i.global.SetFunc("keys", func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("keys() 需要一个参数")
+		}
+
+		dict, ok := args[0].(DictType)
+		if !ok {
+			return nil, fmt.Errorf("keys() 只支持字典，得到: %T", args[0])
+		}
+
+		// 获取所有键
+		keys := make([]Value, 0, len(dict))
+		for key := range dict {
+			keys = append(keys, key)
+		}
+		return keys, nil
+	})
+
+	// 字典的 values
+	i.global.SetFunc("values", func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("values() 需要一个参数")
+		}
+
+		dict, ok := args[0].(DictType)
+		if !ok {
+			return nil, fmt.Errorf("values() 只支持字典，得到: %T", args[0])
+		}
+
+		// 获取所有值
+		values := make([]Value, 0, len(dict))
+		for _, value := range dict {
+			values = append(values, value)
+		}
+		return values, nil
+	})
+
+	// 字典的 items
+	i.global.SetFunc("items", func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("items() 需要一个参数")
+		}
+
+		dict, ok := args[0].(DictType)
+		if !ok {
+			return nil, fmt.Errorf("items() 只支持字典，得到: %T", args[0])
+		}
+
+		// 获取所有键值对（每个键值对是一个包含两个元素的列表）
+		items := make([]Value, 0, len(dict))
+		for key, value := range dict {
+			pair := []Value{key, value}
+			items = append(items, pair)
+		}
+		return items, nil
+	})
+
+	// 字典的 has_key
+	i.global.SetFunc("has_key", func(args []Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("has_key() 需要两个参数: dict, key")
+		}
+
+		dict, ok := args[0].(DictType)
+		if !ok {
+			return nil, fmt.Errorf("has_key() 第一个参数必须是字典，得到: %T", args[0])
+		}
+
+		// 检查键是否存在
+		_, exists := dict[args[1]]
+		return exists, nil
+	})
+
+	// 字典的 delete
+	i.global.SetFunc("delete", func(args []Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("delete() 需要两个参数: dict, key")
+		}
+
+		dict, ok := args[0].(DictType)
+		if !ok {
+			return nil, fmt.Errorf("delete() 第一个参数必须是字典，得到: %T", args[0])
+		}
+
+		// 删除键
+		delete(dict, args[1])
+		return nil, nil
 	})
 }
 
@@ -822,31 +959,133 @@ func (i *Interpreter) evaluateList(list *ast.List, ctx *Context, hang int) Value
 }
 
 func (i *Interpreter) evaluateIndexExpr(expr *ast.IndexExpr, ctx *Context, hang int) Value {
-	// 求值左边的表达式（应该是列表）
+	// 求值左边的表达式（应该是列表或字典）
 	left := i.evaluateExpr(expr.Left, ctx, hang)
 
 	// 求值下标
 	index := i.evaluateExpr(expr.Index, ctx, hang)
 
-	// 检查左边是否是列表
-	list, ok := left.([]Value)
-	if !ok {
-		i.errors = append(i.errors, fmt.Errorf("下标操作只支持列表，得到: %T", left))
+	// 检查左边是列表还是字典
+	switch container := left.(type) {
+	case []Value: // 列表
+		// 检查下标是否是整数
+		idx, ok := index.(int64)
+		if !ok {
+			i.errors = append(i.errors, fmt.Errorf("列表下标必须是整数，得到: %T", index))
+			return nil
+		}
+
+		// 检查下标是否越界
+		if idx < 0 || idx >= int64(len(container)) {
+			i.errors = append(i.errors, fmt.Errorf("列表下标越界: 长度=%d, 下标=%d", len(container), idx))
+			return nil
+		}
+
+		return container[idx]
+
+	case DictType: // 字典
+		// 检查键是否是可哈希的类型
+		if !i.isHashable(index) {
+			i.errors = append(i.errors, fmt.Errorf("字典键必须是可哈希的类型，得到: %T", index))
+			return nil
+		}
+
+		// 查找键对应的值
+		value, exists := container[index]
+		if !exists {
+			i.errors = append(i.errors, fmt.Errorf("字典中不存在键: %v", index))
+			return nil
+		}
+
+		return value
+
+	default:
+		i.errors = append(i.errors, fmt.Errorf("下标操作只支持列表或字典，得到: %T", left))
+		return nil
+	}
+}
+
+func (i *Interpreter) evaluateDict(dict *ast.Dict, ctx *Context, hang int) Value {
+	result := make(DictType)
+
+	for keyExpr, valueExpr := range dict.Pairs {
+		// 求值键
+		key := i.evaluateExpr(keyExpr, ctx, hang)
+
+		// 检查键的类型（在Go中，只有可比较的类型才能作为map的键）
+		// 我们只支持基本类型作为键
+		if !i.isHashable(key) {
+			i.errors = append(i.errors, fmt.Errorf("字典键必须是可哈希的类型，得到: %T", key))
+			return nil
+		}
+
+		// 求值值
+		value := i.evaluateExpr(valueExpr, ctx, hang)
+
+		// 添加到字典
+		result[key] = value
+	}
+
+	return result
+}
+
+// 检查值是否可以作为字典的键
+func (i *Interpreter) isHashable(value Value) bool {
+	switch value.(type) {
+	case int64, float64, string, bool:
+		return true
+	default:
+		return false
+	}
+}
+
+func (i *Interpreter) evaluateIndexAssignStmt(stmt *ast.IndexAssignStmt, ctx *Context, hang int) Value {
+	// 求值右边的表达式
+	value := i.evaluateExpr(stmt.Expr, ctx, hang)
+
+	// 获取目标容器和键/下标
+	target := stmt.Target.Left
+	key := stmt.Target.Index
+
+	// 求值目标容器
+	container := i.evaluateExpr(target, ctx, hang)
+
+	// 求值键/下标
+	index := i.evaluateExpr(key, ctx, hang)
+
+	// 检查容器类型并赋值
+	switch c := container.(type) {
+	case []Value: // 列表
+		// 检查下标是否是整数
+		idx, ok := index.(int64)
+		if !ok {
+			i.errors = append(i.errors, fmt.Errorf("列表下标必须是整数，得到: %T", index))
+			return nil
+		}
+
+		// 检查下标是否越界
+		if idx < 0 || idx >= int64(len(c)) {
+			i.errors = append(i.errors, fmt.Errorf("列表下标越界: 长度=%d, 下标=%d", len(c), idx))
+			return nil
+		}
+
+		// 赋值
+		c[idx] = value
+
+	case DictType: // 字典
+		// 检查键是否是可哈希的类型
+		if !i.isHashable(index) {
+			i.errors = append(i.errors, fmt.Errorf("字典键必须是可哈希的类型，得到: %T", index))
+			return nil
+		}
+
+		// 赋值（添加或修改）
+		c[index] = value
+
+	default:
+		i.errors = append(i.errors, fmt.Errorf("下标赋值只支持列表或字典，得到: %T", container))
 		return nil
 	}
 
-	// 检查下标是否是整数
-	idx, ok := index.(int64)
-	if !ok {
-		i.errors = append(i.errors, fmt.Errorf("列表下标必须是整数，得到: %T", index))
-		return nil
-	}
-
-	// 检查下标是否越界
-	if idx < 0 || idx >= int64(len(list)) {
-		i.errors = append(i.errors, fmt.Errorf("列表下标越界: 长度=%d, 下标=%d", len(list), idx))
-		return nil
-	}
-
-	return list[idx]
+	return value
 }

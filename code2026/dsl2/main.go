@@ -249,43 +249,92 @@ var element = matrix[0][1]
 print("element = ", element)
 
 
+case 6 字典:
+
+var dict = {"a": 1, "b": 2, "c": 3}
+print("dict = ", dict)
+print("dict a = ", dict["a"])
+
+dict["d"] = 4
+dict["a"] = 10
+print("下标赋值 : ", dict["a"])  // 输出: 10
+
+var length = len(dict)  // 4
+print("length : ", length)
+
+
+var keys = keys(dict)
+var i = 0
+while i < len(keys) {
+    var key = keys[i]
+    print(key, ":", dict[key])
+    i = i + 1
+}
+
+var values = values(dict)
+var j = 0
+while j < len(values) {
+    print("循环遍历值 = ", values[j])
+    j = j + 1
+}
+
+
+var pairs = items(dict)
+var k = 0
+while k < len(pairs) {
+    var pair = pairs[k]
+    print("键:", pair[0], "值:", pair[1])
+    k = k + 1
+}
+
+if has_key(dict, "a") {
+    print("字典包含键 'a'")
+}
+
+
+delete(dict, "b")
+print(len(dict))  // 输出: 3
+print(dict["b"])
+
+
+var dict1 = {"x": 1, "y": 2}
+var dict2 = {"y": 3, "z": 4}  // y 会被覆盖
+var merged = dict1 + dict2
+print("字典合并 = ", merged["y"])  // 输出: 3
+
+
+var d1 = {"a": 1, "b": 2}
+var d2 = {"b": 2, "a": 1}
+if d1 == d2 {
+    print("字典相等（键顺序无关）")
+}
+
+
+var complex = {
+    "users": ["Alice", "Bob", "Charlie"],
+    "scores": {"Alice": 95, "Bob": 87},
+    "active": true
+}
+print("嵌套结构 = ", complex["users"][0])    // 输出: Alice
+print("嵌套结构 = ", complex["scores"]["Alice"])  // 输出: 95
+
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-var list1 = [1, 2, 3]
-var list2 = ["a", "b", "c"]
-print("list1 = ", list1)
-print("list2 = ", list2)
-var first = list1[0]  // 1
-var second = list2[1] // "b"
-print("first = ", first)
-print("second = ", second)
-
-var length = len(list1)  
-print("length = ", length)
-
-var i = 0
-while i < len(list1) {
-    print("list i = ", i, " 值: ", list1[i])
-    i = i + 1
-}
-
-var combined = list1 + list2  // [1, 2, 3, "a", "b", "c"]
-print("combined = ", combined)
-
-if [1, 2] == [1, 2] {
-    print("列表相等")
-}
-
-var matrix = [[1, 2], [3, 4]]
-print("matrix = ", matrix)
-var element = matrix[0][1]
-print("element = ", element)
-
-
+var a = 1
+print("[\"a\"] = ", 1)
 `
+
+	/*
+
+		bug1 :  print("dict["a"] = ", dict["a"])    报错，语法没过 , 错误定位是 "dict[\"a\"] = " 被当成Token在处理
+
+
+
+	*/
+
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")
 	runScript(script)

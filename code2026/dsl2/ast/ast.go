@@ -321,3 +321,32 @@ func (i *IndexExpr) String() string {
 	return fmt.Sprintf("%s[%s]", i.Left.String(), i.Index.String())
 }
 func (i *IndexExpr) exprNode() {}
+
+// Dict 字典字面量
+type Dict struct {
+	StartPos Position
+	Pairs    map[Expression]Expression // 键值对
+}
+
+func (d *Dict) Pos() Position { return d.StartPos }
+func (d *Dict) String() string {
+	pairs := make([]string, 0, len(d.Pairs))
+	for key, value := range d.Pairs {
+		pairs = append(pairs, fmt.Sprintf("%s: %s", key.String(), value.String()))
+	}
+	return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+}
+func (d *Dict) exprNode() {}
+
+// IndexAssignStmt 下标赋值语句
+type IndexAssignStmt struct {
+	StartPos Position
+	Target   *IndexExpr
+	Expr     Expression
+}
+
+func (a *IndexAssignStmt) Pos() Position { return a.StartPos }
+func (a *IndexAssignStmt) String() string {
+	return fmt.Sprintf("%s = %s", a.Target.String(), a.Expr.String())
+}
+func (a *IndexAssignStmt) stmtNode() {}
