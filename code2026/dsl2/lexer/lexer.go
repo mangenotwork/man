@@ -7,7 +7,7 @@ package lexer
 */
 
 import (
-	"log"
+	"dsl2/logger"
 	"strings"
 	"unicode"
 )
@@ -184,12 +184,12 @@ func (l *Lexer) NextToken() Token {
 	tok.Line = l.line
 	tok.Column = l.column
 
-	log.Println("NextToken -> ", string(l.ch))
+	logger.Debug("NextToken -> ", string(l.ch))
 
 	switch l.ch {
 	case '=':
 		if l.peekChar() == '=' {
-			log.Println("TokenEQ")
+			logger.Debug("TokenEQ")
 			l.readChar()
 			tok.Type = TokenEQ
 			tok.Literal = "=="
@@ -209,7 +209,7 @@ func (l *Lexer) NextToken() Token {
 				tok.Type = l.lookupIdent(tok.Literal)
 				return tok
 			} else {
-				log.Println("TokenAssign")
+				logger.Debug("TokenAssign")
 				tok.Type = TokenAssign
 				tok.Literal = string(l.ch)
 			}
@@ -312,7 +312,7 @@ func (l *Lexer) NextToken() Token {
 	case '"':
 		tok.Type = TokenString
 		tok.Literal = l.readString()
-		log.Printf("读取到字符串: '%s'", tok.Literal)
+		logger.Debug("读取到字符串: '%s'", tok.Literal)
 	case '.':
 		// 检查是否是浮点数的一部分
 		if isDigit(l.ch) || (l.ch == '.' && isDigit(l.peekChar())) {

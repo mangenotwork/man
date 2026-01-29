@@ -9,8 +9,8 @@ package parser
 import (
 	"dsl2/ast"
 	"dsl2/lexer"
+	"dsl2/logger"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -104,7 +104,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 	}
 
 	for !p.curTokenIs(lexer.TokenEOF) {
-		log.Println("p.curTok == ", p.curTok)
+		logger.Debug("p.curTok == ", p.curTok)
 		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
@@ -137,7 +137,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		return nil
 	}
 
-	log.Println("parseStatement = ", p.curTok)
+	logger.Debug("parseStatement = ", p.curTok)
 
 	p.enter()
 	defer p.leave()
@@ -170,7 +170,7 @@ func (p *Parser) parseSimpleStatement() ast.Statement {
 	if !p.checkDepth() {
 		return nil
 	}
-	log.Println("parseSimpleStatement = ", p.curTok)
+	logger.Debug("parseSimpleStatement = ", p.curTok)
 	p.enter()
 	defer p.leave()
 
@@ -325,13 +325,13 @@ func (p *Parser) parseChromeStatement() *ast.ChromeStmt {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseChromeStatement = ", p.depth)
+	logger.Debug("parseChromeStatement = ", p.depth)
 
 	p.expect(lexer.TokenChrome, "变量声明")
 
 	var args []ast.Expression
 	for i := 0; i < p.depth; i++ {
-		log.Println("[debug]", p.curTok)
+		logger.Debug("[debug]", p.curTok)
 
 		args = append(args, &ast.String{
 			StartPos: ast.Position{
@@ -343,7 +343,7 @@ func (p *Parser) parseChromeStatement() *ast.ChromeStmt {
 		p.nextToken()
 	}
 
-	log.Println("args  = ", args)
+	logger.Debug("args  = ", args)
 
 	stmt := &ast.ChromeStmt{
 		StartPos: ast.Position{
@@ -436,7 +436,7 @@ func (p *Parser) parseBreakStatement() *ast.BreakStmt {
 		return nil
 	}
 
-	log.Println("parseBreakStatement = ", p.curTok)
+	logger.Debug("parseBreakStatement = ", p.curTok)
 
 	p.enter()
 	defer p.leave()
@@ -709,7 +709,7 @@ func (p *Parser) parseExpression() ast.Expression {
 		return nil
 	}
 
-	log.Println("parseExpression = ", p.curTok)
+	logger.Debug("parseExpression = ", p.curTok)
 
 	p.enter()
 	defer p.leave()
@@ -717,7 +717,7 @@ func (p *Parser) parseExpression() ast.Expression {
 	expr := p.parseLogicalOr()
 	if expr == nil {
 		// 解析失败，尝试跳过当前token
-		log.Println("parseExpression: 解析失败，跳过token:", p.curTok)
+		logger.Debug("parseExpression: 解析失败，跳过token:", p.curTok)
 		p.nextToken()
 		return nil
 	}
@@ -733,7 +733,7 @@ func (p *Parser) parseLogicalOr() ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	log.Println("parseLogicalOr = ", p.curTok)
+	logger.Debug("parseLogicalOr = ", p.curTok)
 
 	expr := p.parseLogicalAnd()
 	if expr == nil {
@@ -770,7 +770,7 @@ func (p *Parser) parseLogicalAnd() ast.Expression {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseLogicalAnd = ", p.curTok)
+	logger.Debug("parseLogicalAnd = ", p.curTok)
 	expr := p.parseEquality()
 	if expr == nil {
 		return nil
@@ -806,7 +806,7 @@ func (p *Parser) parseEquality() ast.Expression {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseEquality = ", p.curTok)
+	logger.Debug("parseEquality = ", p.curTok)
 	expr := p.parseComparison()
 	if expr == nil {
 		return nil
@@ -842,7 +842,7 @@ func (p *Parser) parseComparison() ast.Expression {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseComparison = ", p.curTok)
+	logger.Debug("parseComparison = ", p.curTok)
 	expr := p.parseTerm()
 	if expr == nil {
 		return nil
@@ -879,7 +879,7 @@ func (p *Parser) parseTerm() ast.Expression {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseTerm =  ", p.curTok)
+	logger.Debug("parseTerm =  ", p.curTok)
 	expr := p.parseFactor()
 	if expr == nil {
 		return nil
@@ -915,7 +915,7 @@ func (p *Parser) parseFactor() ast.Expression {
 
 	p.enter()
 	defer p.leave()
-	log.Println("parseFactor =  ", p.curTok)
+	logger.Debug("parseFactor =  ", p.curTok)
 	expr := p.parseUnary()
 	if expr == nil {
 		return nil
@@ -951,7 +951,7 @@ func (p *Parser) parseUnary() ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	log.Println("parseUnary =  ", p.curTok)
+	logger.Debug("parseUnary =  ", p.curTok)
 
 	if p.curTokenIs(lexer.TokenNot) || p.curTokenIs(lexer.TokenMinus) {
 
@@ -984,7 +984,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	log.Println("parsePrimary =  ", p.curTok)
+	logger.Debug("parsePrimary =  ", p.curTok)
 
 	switch p.curTok.Type {
 	case lexer.TokenIdent:
@@ -1011,7 +1011,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 
 		errStr := fmt.Sprintf("第%d行第%d列: 期望表达式，得到: %s",
 			p.curTok.Line, p.curTok.Column, p.curTok.Type)
-		log.Println(errStr)
+		logger.Debug(errStr)
 		p.errors = append(p.errors, errStr)
 		return nil
 	}
@@ -1357,7 +1357,7 @@ func (p *Parser) parseCall(left ast.Expression) ast.Expression {
 		for {
 			// 解析参数
 			arg := p.parseExpression()
-			log.Println("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
+			logger.Debug("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
 			if arg != nil {
 				args = append(args, arg)
 			} else {
@@ -1433,11 +1433,11 @@ func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	log.Println("parseIndex: 开始解析下标，当前token:", p.curTok)
+	logger.Debug("parseIndex: 开始解析下标，当前token:", p.curTok)
 
 	// 跳过 [
 	p.nextToken()
-	log.Println("parseIndex: 跳过[后，当前token:", p.curTok)
+	logger.Debug("parseIndex: 跳过[后，当前token:", p.curTok)
 
 	// 解析索引表达式
 	index := p.parseExpression()
@@ -1459,7 +1459,7 @@ func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 		return nil
 	}
 
-	log.Println("parseIndex: 索引表达式解析成功:", index)
+	logger.Debug("parseIndex: 索引表达式解析成功:", index)
 
 	// 期望 ]
 	if !p.curTokenIs(lexer.TokenRBracket) {
@@ -1524,7 +1524,7 @@ func (p *Parser) parseDictLiteral() *ast.Dict {
 	// 解析字典键值对
 	for {
 		// 调试：记录当前位置
-		log.Printf("解析字典键，当前位置: 行=%d, 列=%d, token=%v, literal=%q",
+		logger.Debug("解析字典键，当前位置: 行=%d, 列=%d, token=%v, literal=%q",
 			p.curTok.Line, p.curTok.Column, p.curTok.Type, p.curTok.Literal)
 
 		// 解析键
@@ -1545,7 +1545,7 @@ func (p *Parser) parseDictLiteral() *ast.Dict {
 			return nil
 		}
 
-		log.Printf("键解析成功: %v", key)
+		logger.Debug("键解析成功: %v", key)
 
 		// 期望冒号
 		if !p.expect(lexer.TokenColon, "字典键后期望冒号") {

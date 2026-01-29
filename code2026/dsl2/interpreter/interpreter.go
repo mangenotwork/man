@@ -8,8 +8,8 @@ package interpreter
 
 import (
 	"dsl2/ast"
+	"dsl2/logger"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -98,9 +98,9 @@ func (i *Interpreter) Global() *Context {
 
 // Interpret 执行AST
 func (i *Interpreter) Interpret(program *ast.Program) (Value, error) {
-	log.Println("执行AST ....")
+	logger.Debug("执行AST ....")
 	for n, stmt := range program.Statements {
-		log.Println(n+1, " - Interpret ==> ", stmt)
+		logger.Debug(n+1, " - Interpret ==> ", stmt)
 		_ = i.evaluateStmt(stmt, i.global, n+1) // 忽略返回值
 
 		if i.global.hasReturn {
@@ -113,7 +113,7 @@ func (i *Interpreter) Interpret(program *ast.Program) (Value, error) {
 
 func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) Value {
 
-	log.Println("evaluateStmt ==> ", stmt)
+	logger.Debug("evaluateStmt ==> ", stmt)
 
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
@@ -143,63 +143,63 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 	case *ast.IndexAssignStmt: // 添加下标赋值处理
 		return i.evaluateIndexAssignStmt(s, ctx, hang)
 	default:
-		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
+		logger.Debug("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
 		os.Exit(0)
 	}
 	return nil
 }
 
 func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) Value {
-	log.Println("evaluateExpr ==> ", expr)
+	logger.Debug("evaluateExpr ==> ", expr)
 	switch e := expr.(type) {
 	case *ast.Integer:
-		log.Println("evaluateExpr ast.Integer ==> ", e.Value)
+		logger.Debug("evaluateExpr ast.Integer ==> ", e.Value)
 		return e.Value
 	case *ast.Float: // 添加浮点数求值
-		log.Println("evaluateExpr ast.Float ==> ", e.Value)
+		logger.Debug("evaluateExpr ast.Float ==> ", e.Value)
 		return e.Value
 	case *ast.String:
-		log.Println("evaluateExpr ast.String ==> ", e.Value)
+		logger.Debug("evaluateExpr ast.String ==> ", e.Value)
 		return e.Value
 	case *ast.Boolean:
-		log.Println("evaluateExpr ast.Boolean ==> ", e.Value)
+		logger.Debug("evaluateExpr ast.Boolean ==> ", e.Value)
 		return e.Value
 	case *ast.Identifier:
-		log.Println("evaluateExpr ast.Identifier ==> ", e)
+		logger.Debug("evaluateExpr ast.Identifier ==> ", e)
 		if val, ok := ctx.GetVar(e.Name); ok {
 			return val
 		}
-		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("未定义的变量: %s", e.Name))
+		logger.Debug("[Crash]len:", hang, " | ", fmt.Errorf("未定义的变量: %s", e.Name))
 		os.Exit(0)
 	case *ast.BinaryExpr:
-		log.Println("evaluateExpr ast.BinaryExpr ==> ", e)
+		logger.Debug("evaluateExpr ast.BinaryExpr ==> ", e)
 		return i.evaluateBinaryExpr(e, ctx, hang)
 	case *ast.UnaryExpr:
-		log.Println("evaluateExpr ast.UnaryExpr ==> ", e)
+		logger.Debug("evaluateExpr ast.UnaryExpr ==> ", e)
 		return i.evaluateUnaryExpr(e, ctx, hang)
 
 	case *ast.CallExpr:
-		log.Println("evaluateExpr ast.CallExpr ==> ", e)
+		logger.Debug("evaluateExpr ast.CallExpr ==> ", e)
 		return i.evaluateCallExpr(e, ctx, hang)
 
 	case *ast.List: // 添加列表字面量求值
-		log.Println("evaluateExpr ast.List ==> ", e)
+		logger.Debug("evaluateExpr ast.List ==> ", e)
 		return i.evaluateList(e, ctx, hang)
 
 	case *ast.IndexExpr: // 添加下标表达式求值
-		log.Println("evaluateExpr ast.IndexExpr ==> ", e)
+		logger.Debug("evaluateExpr ast.IndexExpr ==> ", e)
 		return i.evaluateIndexExpr(e, ctx, hang)
 
 	case *ast.Dict: // 添加字典字面量求值
-		log.Println("evaluateExpr ast.Dict ==> ", e)
+		logger.Debug("evaluateExpr ast.Dict ==> ", e)
 		return i.evaluateDict(e, ctx, hang)
 
 	case *ast.ChainCallExpr: // 添加链式调用求值
-		log.Println("evaluateExpr ast.ChainCallExpr ==> ", e)
+		logger.Debug("evaluateExpr ast.ChainCallExpr ==> ", e)
 		return i.evaluateChainCall(e, ctx, hang)
 
 	default:
-		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
+		logger.Debug("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
 		os.Exit(0)
 	}
 	return nil
@@ -223,14 +223,14 @@ func (i *Interpreter) evaluateVarDecl(decl *ast.VarDecl, ctx *Context, hang int)
 			value = nil
 		}
 	}
-	log.Println("evaluateVarDecl ==> ", decl.Name.Name, ":", value)
+	logger.Debug("evaluateVarDecl ==> ", decl.Name.Name, ":", value)
 	ctx.SetVar(decl.Name.Name, value)
 	return value
 }
 
 func (i *Interpreter) evaluateAssignStmt(stmt *ast.AssignStmt, ctx *Context, hang int) Value {
 	value := i.evaluateExpr(stmt.Expr, ctx, hang)
-	log.Println("evaluateAssignStmt ==> ", stmt.Left.Name, ":", value)
+	logger.Debug("evaluateAssignStmt ==> ", stmt.Left.Name, ":", value)
 	ctx.SetVar(stmt.Left.Name, value)
 	return value
 }
@@ -317,7 +317,7 @@ func (i *Interpreter) evaluateCallExpr(expr *ast.CallExpr, ctx *Context, hang in
 }
 
 func (i *Interpreter) evaluateChromeStmt(expr *ast.ChromeStmt, ctx *Context, hang int) Value {
-	log.Println("evaluateChromeStmt args = ", expr.Args)
+	logger.Debug("evaluateChromeStmt args = ", expr.Args)
 	fn, ok := ctx.GetFunc("chrome")
 	if !ok {
 		i.errors = append(i.errors, fmt.Errorf("未定义Chrome"))
@@ -340,10 +340,10 @@ func (i *Interpreter) evaluateChromeStmt(expr *ast.ChromeStmt, ctx *Context, han
 func (i *Interpreter) evaluateBlockStmt(block *ast.BlockStmt, ctx *Context, hang int) Value {
 	// 创建一个新的作用域
 	newCtx := NewContext(ctx)
-	log.Println("evaluateBlockStmt ==> ", block.Stmts)
+	logger.Debug("evaluateBlockStmt ==> ", block.Stmts)
 
 	for _, stmt := range block.Stmts {
-		log.Println("evaluateBlockStmt is stmt item ==> ", stmt)
+		logger.Debug("evaluateBlockStmt is stmt item ==> ", stmt)
 
 		switch stmt.(type) {
 		case *ast.BreakStmt:
@@ -368,7 +368,7 @@ func (i *Interpreter) evaluateBlockStmt(block *ast.BlockStmt, ctx *Context, hang
 
 func (i *Interpreter) evaluateIfStmt(stmt *ast.IfStmt, ctx *Context, hang int) Value {
 	condition := i.evaluateExpr(stmt.Condition, ctx, hang)
-	log.Println("evaluateBlockStmt ==> ", stmt)
+	logger.Debug("evaluateBlockStmt ==> ", stmt)
 	if i.bool(condition) {
 		return i.evaluateBlockStmt(stmt.Then, ctx, hang)
 	} else if stmt.Else != nil {
@@ -384,7 +384,7 @@ func (i *Interpreter) evaluateIfStmt(stmt *ast.IfStmt, ctx *Context, hang int) V
 }
 
 func (i *Interpreter) evaluateWhileStmt(stmt *ast.WhileStmt, ctx *Context, hang int) Value {
-	log.Println("evaluateWhileStmt ==> ", stmt)
+	logger.Debug("evaluateWhileStmt ==> ", stmt)
 	for {
 		// 检查循环条件
 		condition := i.evaluateExpr(stmt.Condition, ctx, hang)
@@ -493,7 +493,7 @@ func (i *Interpreter) evaluateReturnStmt(stmt *ast.ReturnStmt, ctx *Context, han
 	if stmt.Expr != nil {
 		value = i.evaluateExpr(stmt.Expr, ctx, hang)
 	}
-	log.Println("evaluateReturnStmt ==> ", stmt, value)
+	logger.Debug("evaluateReturnStmt ==> ", stmt, value)
 	ctx.hasReturn = true
 	ctx.returnVal = &value
 	return value
@@ -1141,14 +1141,14 @@ func (i *Interpreter) evaluateIndexAssignStmt(stmt *ast.IndexAssignStmt, ctx *Co
 }
 
 func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, hang int) Value {
-	log.Println("evaluateChainCall ==> ", chain)
+	logger.Debug("evaluateChainCall ==> ", chain)
 
 	// 存储前一个函数调用的返回值
 	var lastResult Value = nil
 
 	// 按顺序执行链式调用中的每个函数
 	for callIndex, call := range chain.Calls {
-		log.Printf("执行链式调用第 %d 个函数: %s", callIndex+1, call.Function.Name)
+		logger.Debug("执行链式调用第 %d 个函数: %s", callIndex+1, call.Function.Name)
 
 		// 获取函数
 		fn, ok := ctx.GetFunc(call.Function.Name)
@@ -1171,7 +1171,7 @@ func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, 
 			newArgs[0] = lastResult
 			copy(newArgs[1:], args)
 			args = newArgs
-			log.Printf("管道传递: 前一个结果 %v 作为 %s 的第一个参数", lastResult, call.Function.Name)
+			logger.Debug("管道传递: 前一个结果 %v 作为 %s 的第一个参数", lastResult, call.Function.Name)
 		}
 
 		// 执行函数
@@ -1183,7 +1183,7 @@ func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, 
 
 		// 保存结果，供下一个函数使用
 		lastResult = result
-		log.Printf("函数 %s 返回: %v", call.Function.Name, result)
+		logger.Debug("函数 %s 返回: %v", call.Function.Name, result)
 	}
 
 	// 返回最后一个函数的结果
