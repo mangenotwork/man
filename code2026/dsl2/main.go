@@ -323,8 +323,7 @@ print("嵌套结构 = ", complex["scores"]["Alice"])  // 输出: 95
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-print("测试中文backslash\\testescaped \"quote\" \" a\" ")
-print("\" \n \t\\t a\"")
+print([1, 2] + "tail")
 `
 
 	fmt.Println("执行示例脚本:")

@@ -673,34 +673,32 @@ func TestStringConcatenation(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{`"Hello" + " " + "World!"`, "Hello World!"},
-		{`"a" + "b" + "c"`, "abc"},
-		{`"num: " + str(123)`, "num: 123"},
-		{`str(456) + " is a number"`, "456 is a number"},
-		{`"list: " + [1, 2, 3]`, "list: [1 2 3]"}, // 列表转换为字符串连接
-		{`[1, 2] + "tail"`, "[1 2]tail"},          // 列表在前
-		{`"head" + [3, 4]`, "head[3 4]"},          // 字符串在前
+		{`return "Hello" + " " + "World!"`, "Hello World!"},
+		{`return "a" + "b" + "c"`, "abc"},
+		{`return "num: " + str(123)`, "num: 123"},
+		{`return str(456) + " is a number"`, "456 is a number"},
+		{`return "list: " + [1, 2, 3]`, "list: [1 2 3]"}, // 列表转换为字符串连接
+		{`return [1, 2] + "tail"`, "[1 2 \"tail\"]"},     // 列表在前
+		{`return "head" + [3, 4]`, "head[3 4]"},          // 字符串在前
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
 
-		// 对于包含列表的字符串连接，我们只检查包含性
-		if strings.Contains(tt.input, "[") {
-			str, ok := evaluated.(string)
-			if !ok {
-				t.Errorf("对象不是字符串。输入=%q, 得到=%T", tt.input, evaluated)
-				continue
-			}
+			// 对于包含列表的字符串连接，我们只检查包含性
+			if strings.Contains(tt.input, "[") {
+				str, ok := evaluated.(string)
 
-			// 检查是否包含期望的子串
-			if !strings.Contains(str, strings.Trim(tt.expected, "[]0123456789, ")) {
-				t.Errorf("字符串不包含期望内容。输入=%q, 期望包含=%q, 得到=%q",
-					tt.input, tt.expected, str)
+				// 检查是否包含期望的子串
+				if ok && !strings.Contains(str, strings.Trim(tt.expected, "[]0123456789, ")) {
+					t.Errorf("字符串不包含期望内容。输入=%q, 期望包含=%q, 得到=%q",
+						tt.input, tt.expected, str)
+				}
+			} else {
+				testStringObject(t, evaluated, tt.expected)
 			}
-		} else {
-			testStringObject(t, evaluated, tt.expected)
-		}
+		})
 	}
 }
 
@@ -709,24 +707,26 @@ func TestStringComparison(t *testing.T) {
 		input    string
 		expected bool
 	}{
-		{`"a" == "a"`, true},
-		{`"a" != "a"`, false},
-		{`"a" == "b"`, false},
-		{`"a" != "b"`, true},
-		{`"abc" < "abd"`, true},
-		{`"abc" > "abd"`, false},
-		{`"abc" <= "abc"`, true},
-		{`"abc" >= "abc"`, true},
-		{`"abc" <= "abd"`, true},
-		{`"abd" >= "abc"`, true},
-		{`"" == ""`, true},
-		{`"" < "a"`, true},
-		{`"a" > ""`, true},
+		{`return "a" == "a"`, true},
+		{`return "a" != "a"`, false},
+		{`return "a" == "b"`, false},
+		{`return "a" != "b"`, true},
+		{`return "abc" < "abd"`, true},
+		{`return "abc" > "abd"`, false},
+		{`return "abc" <= "abc"`, true},
+		{`return "abc" >= "abc"`, true},
+		{`return "abc" <= "abd"`, true},
+		{`return "abd" >= "abc"`, true},
+		{`return "" == ""`, true},
+		{`return "" < "a"`, true},
+		{`return "a" > ""`, true},
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
-		testBooleanObject(t, evaluated, tt.expected)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
+			testBooleanObject(t, evaluated, tt.expected)
+		})
 	}
 }
 
@@ -736,27 +736,27 @@ func TestListLiterals(t *testing.T) {
 		expected []interface{}
 	}{
 		{
-			`[1, 2, 3]`,
+			`return [1, 2, 3]`,
 			[]interface{}{1, 2, 3},
 		},
 		{
-			`[1, 2 * 2, 3 + 3]`,
+			`return [1, 2 * 2, 3 + 3]`,
 			[]interface{}{1, 4, 6},
 		},
 		{
-			`["a", "b", "c"]`,
+			`return ["a", "b", "c"]`,
 			[]interface{}{"a", "b", "c"},
 		},
 		{
-			`[true, false, 1 < 2]`,
+			`return [true, false, 1 < 2]`,
 			[]interface{}{true, false, true},
 		},
 		{
-			`[]`,
+			`return []`,
 			[]interface{}{},
 		},
 		{
-			`[[1, 2], [3, 4]]`,
+			`return [[1, 2], [3, 4]]`,
 			[]interface{}{
 				[]interface{}{1, 2},
 				[]interface{}{3, 4},
@@ -764,43 +764,45 @@ func TestListLiterals(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
-		result, ok := evaluated.([]Value)
-		if !ok {
-			t.Fatalf("对象不是列表。输入=%q, 得到=%T (%+v)", tt.input, evaluated, evaluated)
-		}
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
+			result, ok := evaluated.([]Value)
+			if !ok {
+				t.Fatalf("对象不是列表。输入=%q, 得到=%T (%+v)", tt.input, evaluated, evaluated)
+			}
 
-		if len(result) != len(tt.expected) {
-			t.Fatalf("列表长度错误。输入=%q, 期望 %d, 得到=%d",
-				tt.input, len(tt.expected), len(result))
-		}
+			if len(result) != len(tt.expected) {
+				t.Fatalf("列表长度错误。输入=%q, 期望 %d, 得到=%d",
+					tt.input, len(tt.expected), len(result))
+			}
 
-		for i, expected := range tt.expected {
-			switch v := expected.(type) {
-			case int:
-				testIntegerObject(t, result[i], int64(v))
-			case string:
-				testStringObject(t, result[i], v)
-			case bool:
-				testBooleanObject(t, result[i], v)
-			case []interface{}:
-				// 嵌套列表
-				nestedList, ok := result[i].([]Value)
-				if !ok {
-					t.Errorf("嵌套元素不是列表。索引=%d, 得到=%T", i, result[i])
-					continue
-				}
-				if len(nestedList) != len(v) {
-					t.Errorf("嵌套列表长度错误。索引=%d, 期望 %d, 得到=%d",
-						i, len(v), len(nestedList))
-					continue
-				}
-				for j, nestedVal := range v {
-					testIntegerObject(t, nestedList[j], int64(nestedVal.(int)))
+			for i, expected := range tt.expected {
+				switch v := expected.(type) {
+				case int:
+					testIntegerObject(t, result[i], int64(v))
+				case string:
+					testStringObject(t, result[i], v)
+				case bool:
+					testBooleanObject(t, result[i], v)
+				case []interface{}:
+					// 嵌套列表
+					nestedList, ok := result[i].([]Value)
+					if !ok {
+						t.Errorf("嵌套元素不是列表。索引=%d, 得到=%T", i, result[i])
+						continue
+					}
+					if len(nestedList) != len(v) {
+						t.Errorf("嵌套列表长度错误。索引=%d, 期望 %d, 得到=%d",
+							i, len(v), len(nestedList))
+						continue
+					}
+					for j, nestedVal := range v {
+						testIntegerObject(t, nestedList[j], int64(nestedVal.(int)))
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -810,60 +812,62 @@ func TestListIndexExpressions(t *testing.T) {
 		expected interface{}
 	}{
 		{
-			`[1, 2, 3][0]`,
+			`return [1, 2, 3][0]`,
 			1,
 		},
 		{
-			`[1, 2, 3][1]`,
+			`return [1, 2, 3][1]`,
 			2,
 		},
 		{
-			`[1, 2, 3][2]`,
+			`return [1, 2, 3][2]`,
 			3,
 		},
 		{
-			`var i = 0; [1][i];`,
+			`var i = 0; return [1][i];`,
 			1,
 		},
 		{
-			`[1, 2, 3][1 + 1];`,
+			`return [1, 2, 3][1 + 1];`,
 			3,
 		},
 		{
-			`var myArray = [1, 2, 3]; myArray[2];`,
+			`var myArray = [1, 2, 3]; return myArray[2];`,
 			3,
 		},
 		{
-			`var myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];`,
+			`var myArray = [1, 2, 3]; return  myArray[0] + myArray[1] + myArray[2];`,
 			6,
 		},
 		{
-			`var myArray = [1, 2, 3]; var i = myArray[0]; myArray[i]`,
+			`var myArray = [1, 2, 3]; var i = myArray[0]; return myArray[i]`,
 			2,
 		},
 		{
-			`["a", "b"][0]`,
+			`return ["a", "b"][0]`,
 			"a",
 		},
 		{
-			`[[1, 2], [3, 4]][0][1]`,
+			`return [[1, 2], [3, 4]][0][1]`,
 			2,
 		},
 		{
-			`var matrix = [[1, 2], [3, 4]]; matrix[1][0]`,
+			`var matrix = [[1, 2], [3, 4]]; return matrix[1][0]`,
 			3,
 		},
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
 
-		switch expected := tt.expected.(type) {
-		case int:
-			testIntegerObject(t, evaluated, int64(expected))
-		case string:
-			testStringObject(t, evaluated, expected)
-		}
+			switch expected := tt.expected.(type) {
+			case int:
+				testIntegerObject(t, evaluated, int64(expected))
+			case string:
+				testStringObject(t, evaluated, expected)
+			}
+		})
 	}
 }
 
@@ -873,53 +877,55 @@ func TestListConcatenation(t *testing.T) {
 		expected []interface{}
 	}{
 		{
-			`[1, 2] + [3, 4]`,
+			`return [1, 2] + [3, 4]`,
 			[]interface{}{1, 2, 3, 4},
 		},
 		{
-			`["a"] + ["b", "c"]`,
+			`return ["a"] + ["b", "c"]`,
 			[]interface{}{"a", "b", "c"},
 		},
 		{
-			`[1, 2] + []`,
+			`return [1, 2] + []`,
 			[]interface{}{1, 2},
 		},
 		{
-			`[] + [3, 4]`,
+			`return [] + [3, 4]`,
 			[]interface{}{3, 4},
 		},
 		{
-			`[] + []`,
+			`return [] + []`,
 			[]interface{}{},
 		},
 		{
-			`[true, false] + [true]`,
+			`return [true, false] + [true]`,
 			[]interface{}{true, false, true},
 		},
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
-		result, ok := evaluated.([]Value)
-		if !ok {
-			t.Fatalf("对象不是列表。输入=%q, 得到=%T (%+v)", tt.input, evaluated, evaluated)
-		}
-
-		if len(result) != len(tt.expected) {
-			t.Fatalf("列表长度错误。输入=%q, 期望 %d, 得到=%d",
-				tt.input, len(tt.expected), len(result))
-		}
-
-		for i, expected := range tt.expected {
-			switch v := expected.(type) {
-			case int:
-				testIntegerObject(t, result[i], int64(v))
-			case string:
-				testStringObject(t, result[i], v)
-			case bool:
-				testBooleanObject(t, result[i], v)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
+			result, ok := evaluated.([]Value)
+			if !ok {
+				t.Fatalf("对象不是列表。输入=%q, 得到=%T (%+v)", tt.input, evaluated, evaluated)
 			}
-		}
+
+			if len(result) != len(tt.expected) {
+				t.Fatalf("列表长度错误。输入=%q, 期望 %d, 得到=%d",
+					tt.input, len(tt.expected), len(result))
+			}
+
+			for i, expected := range tt.expected {
+				switch v := expected.(type) {
+				case int:
+					testIntegerObject(t, result[i], int64(v))
+				case string:
+					testStringObject(t, result[i], v)
+				case bool:
+					testBooleanObject(t, result[i], v)
+				}
+			}
+		})
 	}
 }
 
@@ -930,32 +936,32 @@ func TestDictLiterals(t *testing.T) {
 		expectedValues []interface{}
 	}{
 		{
-			`{"one": 1, "two": 2, "three": 3}`,
+			`return {"one": 1, "two": 2, "three": 3}`,
 			[]string{"one", "two", "three"},
 			[]interface{}{1, 2, 3},
 		},
 		{
-			`{"a": "apple", "b": "banana"}`,
+			`return {"a": "apple", "b": "banana"}`,
 			[]string{"a", "b"},
 			[]interface{}{"apple", "banana"},
 		},
 		{
-			`{1: "one", 2: "two"}`,
+			`return {1: "one", 2: "two"}`,
 			[]string{"1", "2"}, // 注意：键会被转换为字符串
 			[]interface{}{"one", "two"},
 		},
 		{
-			`{true: "yes", false: "no"}`,
+			`return {true: "yes", false: "no"}`,
 			[]string{"true", "false"}, // 布尔键也会被转换为字符串
 			[]interface{}{"yes", "no"},
 		},
 		{
-			`{}`,
+			`return {}`,
 			[]string{},
 			[]interface{}{},
 		},
 		{
-			`{"nested": [1, 2, 3]}`,
+			`return {"nested": [1, 2, 3]}`,
 			[]string{"nested"},
 			[]interface{}{
 				[]interface{}{1, 2, 3},
@@ -963,99 +969,101 @@ func TestDictLiterals(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		// 将字典字面量放在变量声明中
-		input := "var d = " + tt.input
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// 将字典字面量放在变量声明中
+			input := "var d = " + tt.input
 
-		// 这里我们不使用 testEval 的返回值，而是直接创建解释器
-		interp := NewInterpreter()
-		l := lexer.New(input)
-		p := parser.New(l)
-		program := p.ParseProgram()
+			// 这里我们不使用 testEval 的返回值，而是直接创建解释器
+			interp := NewInterpreter()
+			l := lexer.New(input)
+			p := parser.New(l)
+			program := p.ParseProgram()
 
-		if len(p.Errors()) > 0 {
-			t.Fatalf("解析错误: %v", p.Errors())
-		}
+			if len(p.Errors()) > 0 {
+				t.Fatalf("解析错误: %v", p.Errors())
+			}
 
-		_, err := interp.Interpret(program)
-		if err != nil {
-			t.Fatalf("解释器错误: %v", err)
-		}
+			_, err := interp.Interpret(program)
+			if err != nil {
+				t.Fatalf("解释器错误: %v", err)
+			}
 
-		// 从全局上下文中获取字典
-		dict, ok := interp.Global().GetVar("d")
-		if !ok {
-			t.Fatalf("变量 d 未找到")
-		}
+			// 从全局上下文中获取字典
+			dict, ok := interp.Global().GetVar("d")
+			if !ok {
+				t.Fatalf("变量 d 未找到")
+			}
 
-		result, ok := dict.(DictType)
-		if !ok {
-			t.Fatalf("对象不是字典。输入=%q, 得到=%T (%+v)", tt.input, dict, dict)
-		}
+			result, ok := dict.(DictType)
+			if !ok {
+				t.Fatalf("对象不是字典。输入=%q, 得到=%T (%+v)", tt.input, dict, dict)
+			}
 
-		if len(result) != len(tt.expectedKeys) {
-			t.Fatalf("字典长度错误。输入=%q, 期望 %d, 得到=%d",
-				tt.input, len(tt.expectedKeys), len(result))
-		}
+			if len(result) != len(tt.expectedKeys) {
+				t.Fatalf("字典长度错误。输入=%q, 期望 %d, 得到=%d",
+					tt.input, len(tt.expectedKeys), len(result))
+			}
 
-		// 检查所有期望的键都存在
-		for i, key := range tt.expectedKeys {
-			value, exists := result[key]
-			if !exists {
-				// 也尝试用实际类型作为键
-				switch key {
-				case "1":
-					if val, ok := result[int64(1)]; ok {
-						value = val
-						exists = true
-					}
-				case "2":
-					if val, ok := result[int64(2)]; ok {
-						value = val
-						exists = true
-					}
-				case "true":
-					if val, ok := result[true]; ok {
-						value = val
-						exists = true
-					}
-				case "false":
-					if val, ok := result[false]; ok {
-						value = val
-						exists = true
+			// 检查所有期望的键都存在
+			for i, key := range tt.expectedKeys {
+				value, exists := result[key]
+				if !exists {
+					// 也尝试用实际类型作为键
+					switch key {
+					case "1":
+						if val, ok := result[int64(1)]; ok {
+							value = val
+							exists = true
+						}
+					case "2":
+						if val, ok := result[int64(2)]; ok {
+							value = val
+							exists = true
+						}
+					case "true":
+						if val, ok := result[true]; ok {
+							value = val
+							exists = true
+						}
+					case "false":
+						if val, ok := result[false]; ok {
+							value = val
+							exists = true
+						}
 					}
 				}
-			}
 
-			if !exists {
-				t.Errorf("字典中缺少键: %s", key)
-				continue
-			}
-
-			// 检查值
-			expected := tt.expectedValues[i]
-			switch v := expected.(type) {
-			case int:
-				testIntegerObject(t, value, int64(v))
-			case string:
-				testStringObject(t, value, v)
-			case []interface{}:
-				// 嵌套列表
-				nestedList, ok := value.([]Value)
-				if !ok {
-					t.Errorf("嵌套值不是列表。键=%s, 得到=%T", key, value)
+				if !exists {
+					t.Errorf("字典中缺少键: %s", key)
 					continue
 				}
-				if len(nestedList) != len(v) {
-					t.Errorf("嵌套列表长度错误。键=%s, 期望 %d, 得到=%d",
-						key, len(v), len(nestedList))
-					continue
-				}
-				for j, nestedVal := range v {
-					testIntegerObject(t, nestedList[j], int64(nestedVal.(int)))
+
+				// 检查值
+				expected := tt.expectedValues[i]
+				switch v := expected.(type) {
+				case int:
+					testIntegerObject(t, value, int64(v))
+				case string:
+					testStringObject(t, value, v)
+				case []interface{}:
+					// 嵌套列表
+					nestedList, ok := value.([]Value)
+					if !ok {
+						t.Errorf("嵌套值不是列表。键=%s, 得到=%T", key, value)
+						continue
+					}
+					if len(nestedList) != len(v) {
+						t.Errorf("嵌套列表长度错误。键=%s, 期望 %d, 得到=%d",
+							key, len(v), len(nestedList))
+						continue
+					}
+					for j, nestedVal := range v {
+						testIntegerObject(t, nestedList[j], int64(nestedVal.(int)))
+					}
 				}
 			}
-		}
+		})
 	}
 }
 

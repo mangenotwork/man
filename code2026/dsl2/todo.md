@@ -12,11 +12,6 @@ TestChainCallExpressions
 TestDictFunctions
 TestDictIndexExpressions
 TestDictLiterals
-TestListConcatenation
-TestListIndexExpressions
-TestListLiterals
-TestStringComparison
-TestStringConcatenation
 - 新增 table 例如 table 1 open url # 在第一个table页输入百度的链接
 - 新增 input 例如 input "//*[@id="chat-textarea"]" ciList[i]   # 在Xpath定位出输入 数据
 - 新增 click 例如 click SearchXpath("百度一下")   # 在页面搜索"百度一下"文本定位位置，搜索到了点击
