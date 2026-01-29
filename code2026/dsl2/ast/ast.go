@@ -29,8 +29,16 @@ type Program struct {
 	Statements []Statement
 }
 
-func (p *Program) Pos() Position  { return p.StartPos }
-func (p *Program) String() string { return "Program" }
+func (p *Program) Pos() Position { return p.StartPos }
+func (p *Program) String() string {
+	var out strings.Builder
+
+	for _, stmt := range p.Statements {
+		out.WriteString(stmt.String())
+	}
+
+	return out.String()
+}
 
 // Statement 语句接口
 type Statement interface {
@@ -72,6 +80,16 @@ type Integer struct {
 func (i *Integer) Pos() Position  { return i.StartPos }
 func (i *Integer) String() string { return fmt.Sprintf("%d", i.Value) }
 func (i *Integer) exprNode()      {}
+
+// Float 浮点数字面量
+type Float struct {
+	StartPos Position
+	Value    float64
+}
+
+func (f *Float) Pos() Position  { return f.StartPos }
+func (f *Float) String() string { return fmt.Sprintf("%g", f.Value) }
+func (f *Float) exprNode()      {}
 
 // String 字符串字面量
 type String struct {

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 )
 
 type Parser struct {
@@ -711,10 +712,17 @@ func (p *Parser) parseExpression() ast.Expression {
 	log.Println("parseExpression = ", p.curTok)
 
 	p.enter()
-
 	defer p.leave()
 
-	return p.parseLogicalOr()
+	expr := p.parseLogicalOr()
+	if expr == nil {
+		// 解析失败，尝试跳过当前token
+		log.Println("parseExpression: 解析失败，跳过token:", p.curTok)
+		p.nextToken()
+		return nil
+	}
+
+	return expr
 }
 
 func (p *Parser) parseLogicalOr() ast.Expression {
@@ -982,7 +990,13 @@ func (p *Parser) parsePrimary() ast.Expression {
 	case lexer.TokenIdent:
 		return p.parseIdentifierOrCall()
 	case lexer.TokenInt:
+		// 检查是否是浮点数（包含小数点）
+		if strings.Contains(p.curTok.Literal, ".") {
+			return p.parseFloat()
+		}
 		return p.parseInteger()
+	case lexer.TokenFloat:
+		return p.parseFloat()
 	case lexer.TokenString:
 		return p.parseString()
 	case lexer.TokenTrue, lexer.TokenFalse:
@@ -1097,6 +1111,12 @@ func (p *Parser) parseInteger() ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	// 检查是否是浮点数
+	if strings.Contains(p.curTok.Literal, ".") {
+		// 这实际上是浮点数，调用 parseFloat
+		return p.parseFloat()
+	}
+
 	value, err := strconv.ParseInt(p.curTok.Literal, 10, 64)
 	if err != nil {
 		p.errors = append(p.errors,
@@ -1106,6 +1126,35 @@ func (p *Parser) parseInteger() ast.Expression {
 	}
 
 	expr := &ast.Integer{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		Value: value,
+	}
+
+	p.nextToken()
+	return expr
+}
+
+func (p *Parser) parseFloat() ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 将字符串转换为float64
+	value, err := strconv.ParseFloat(p.curTok.Literal, 64)
+	if err != nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 无法解析浮点数: %s",
+				p.curTok.Line, p.curTok.Column, p.curTok.Literal))
+		return nil
+	}
+
+	expr := &ast.Float{
 		StartPos: ast.Position{
 			Line:   p.curTok.Line,
 			Column: p.curTok.Column,
@@ -1145,13 +1194,12 @@ func (p *Parser) parseBoolean() ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	value := p.curTok.Type == lexer.TokenTrue
 	expr := &ast.Boolean{
 		StartPos: ast.Position{
 			Line:   p.curTok.Line,
 			Column: p.curTok.Column,
 		},
-		Value: value,
+		Value: p.curTok.Type == lexer.TokenTrue,
 	}
 
 	p.nextToken()
@@ -1246,6 +1294,19 @@ func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	// 检查当前token是否是点号，并且前一个表达式不是数字
+	// 这样可以防止 1.5 被解析为链式调用
+	if p.curTokenIs(lexer.TokenDot) {
+		// 检查expr是否是数字字面量
+		switch expr.(type) {
+		case *ast.Integer, *ast.Float:
+			// 数字后面不能跟点号进行链式调用
+			return expr
+		default:
+			return p.parseChainCall(expr)
+		}
+	}
+
 	// 循环处理多个下标或调用
 	for {
 		switch p.curTok.Type {
@@ -1256,8 +1317,15 @@ func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
 			// 下标表达式
 			expr = p.parseIndex(expr)
 		case lexer.TokenDot:
-			// 链式调用
-			expr = p.parseChainCall(expr)
+			// 再次检查是否是数字
+			switch expr.(type) {
+			case *ast.Integer, *ast.Float:
+				// 数字后面不能跟点号
+				p.errors = append(p.errors, "数字后面不能使用点号操作符")
+				return nil
+			default:
+				expr = p.parseChainCall(expr)
+			}
 		default:
 			// 既不是调用也不是下标也不是链式，返回当前表达式
 			return expr
@@ -1322,6 +1390,41 @@ func (p *Parser) parseCall(left ast.Expression) ast.Expression {
 	}
 }
 
+//func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
+//	if !p.checkDepth() {
+//		return nil
+//	}
+//
+//	p.enter()
+//	defer p.leave()
+//
+//	// 保存左表达式的位置
+//	pos := ast.Position{
+//		Line:   p.curTok.Line,
+//		Column: p.curTok.Column,
+//	}
+//
+//	p.nextToken() // 跳过 [
+//
+//	// 解析下标表达式
+//	indexExpr := p.parseExpression()
+//	if indexExpr == nil {
+//		p.errors = append(p.errors, "下标表达式解析失败")
+//		return nil
+//	}
+//
+//	// 期望右括号
+//	if !p.expect(lexer.TokenRBracket, "下标表达式后") {
+//		return nil
+//	}
+//
+//	return &ast.IndexExpr{
+//		StartPos: pos,
+//		Left:     left,
+//		Index:    indexExpr,
+//	}
+//}
+
 func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 	if !p.checkDepth() {
 		return nil
@@ -1330,30 +1433,60 @@ func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	// 保存左表达式的位置
-	pos := ast.Position{
-		Line:   p.curTok.Line,
-		Column: p.curTok.Column,
-	}
+	log.Println("parseIndex: 开始解析下标，当前token:", p.curTok)
 
-	p.nextToken() // 跳过 [
+	// 跳过 [
+	p.nextToken()
+	log.Println("parseIndex: 跳过[后，当前token:", p.curTok)
 
-	// 解析下标表达式
-	indexExpr := p.parseExpression()
-	if indexExpr == nil {
-		p.errors = append(p.errors, "下标表达式解析失败")
+	// 解析索引表达式
+	index := p.parseExpression()
+	if index == nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 下标表达式解析失败",
+				p.curTok.Line, p.curTok.Column))
+
+		// 尝试恢复：跳过直到遇到 ] 或文件结束
+		for p.curTok.Type != lexer.TokenRBracket && p.curTok.Type != lexer.TokenEOF {
+			p.nextToken()
+		}
+
+		// 跳过 ]
+		if p.curTokenIs(lexer.TokenRBracket) {
+			p.nextToken()
+		}
+
 		return nil
 	}
 
-	// 期望右括号
-	if !p.expect(lexer.TokenRBracket, "下标表达式后") {
+	log.Println("parseIndex: 索引表达式解析成功:", index)
+
+	// 期望 ]
+	if !p.curTokenIs(lexer.TokenRBracket) {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 下标表达式后期望]，得到 %s",
+				p.curTok.Line, p.curTok.Column, p.curTok.Type))
+
+		// 尝试恢复：跳过直到遇到 ] 或文件结束
+		for p.curTok.Type != lexer.TokenRBracket && p.curTok.Type != lexer.TokenEOF {
+			p.nextToken()
+		}
+
+		// 跳过 ]
+		if p.curTokenIs(lexer.TokenRBracket) {
+			p.nextToken()
+		}
+
 		return nil
 	}
+
+	// 跳过 ]
+	p.nextToken()
 
 	return &ast.IndexExpr{
-		StartPos: pos,
+		StartPos: left.Pos(),
 		Left:     left,
-		Index:    indexExpr,
+		Index:    index,
 	}
 }
 
@@ -1373,40 +1506,81 @@ func (p *Parser) parseDictLiteral() *ast.Dict {
 		Pairs: make(map[ast.Expression]ast.Expression),
 	}
 
-	p.nextToken() // 跳过 {
+	// 记录当前位置以便调试
+	currentLine := p.curTok.Line
+	currentColumn := p.curTok.Column
+
+	// 跳过 {
+	if !p.expect(lexer.TokenLBrace, "字典开始") {
+		return nil
+	}
+
+	// 如果立即遇到 }，返回空字典
+	if p.curTokenIs(lexer.TokenRBrace) {
+		p.nextToken() // 跳过 }
+		return dict
+	}
 
 	// 解析字典键值对
-	if !p.curTokenIs(lexer.TokenRBrace) {
-		for {
-			// 解析键
-			key := p.parseExpression()
-			if key == nil {
-				p.errors = append(p.errors, "字典键解析失败")
-				return nil
-			}
+	for {
+		// 调试：记录当前位置
+		log.Printf("解析字典键，当前位置: 行=%d, 列=%d, token=%v, literal=%q",
+			p.curTok.Line, p.curTok.Column, p.curTok.Type, p.curTok.Literal)
 
-			// 期望冒号
-			if !p.expect(lexer.TokenColon, "字典键后") {
-				return nil
-			}
+		// 解析键
+		key := p.parseExpression()
+		if key == nil {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 字典键解析失败",
+					p.curTok.Line, p.curTok.Column))
+			return nil
+		}
 
-			// 解析值
-			value := p.parseExpression()
-			if value == nil {
-				p.errors = append(p.errors, "字典值解析失败")
-				return nil
-			}
+		// 检查键类型：不允许布尔值作为键
+		switch key.String() {
+		case "true:", "false:":
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 布尔值不能作为字典键",
+					p.curTok.Line, p.curTok.Column))
+			return nil
+		}
 
-			// 将键值对添加到字典
-			dict.Pairs[key] = value
+		log.Printf("键解析成功: %v", key)
 
-			// 检查是否有更多键值对
-			if p.curTokenIs(lexer.TokenComma) {
-				p.nextToken() // 跳过逗号
-				continue
-			}
+		// 期望冒号
+		if !p.expect(lexer.TokenColon, "字典键后期望冒号") {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 字典键后期望冒号，得到 %s",
+					currentLine, currentColumn, p.curTok.Type))
+			return nil
+		}
 
+		// 解析值
+		value := p.parseExpression()
+		if value == nil {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 字典值解析失败",
+					p.curTok.Line, p.curTok.Column))
+			return nil
+		}
+
+		// 将键值对添加到字典
+		dict.Pairs[key] = value
+
+		// 检查是否有更多键值对
+		if !p.curTokenIs(lexer.TokenComma) {
 			break
+		}
+
+		// 跳过逗号
+		p.nextToken()
+
+		// 如果逗号后立即遇到 }，这是语法错误
+		if p.curTokenIs(lexer.TokenRBrace) {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 字典中多余的逗号",
+					p.curTok.Line, p.curTok.Column))
+			return nil
 		}
 	}
 

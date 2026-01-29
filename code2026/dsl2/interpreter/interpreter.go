@@ -155,6 +155,9 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 	case *ast.Integer:
 		log.Println("evaluateExpr ast.Integer ==> ", e.Value)
 		return e.Value
+	case *ast.Float: // 添加浮点数求值
+		log.Println("evaluateExpr ast.Float ==> ", e.Value)
+		return e.Value
 	case *ast.String:
 		log.Println("evaluateExpr ast.String ==> ", e.Value)
 		return e.Value
@@ -846,6 +849,11 @@ func (i *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("无法转换字符串为int: %s", v)
 			}
 			return result, nil
+		case bool:
+			if v {
+				return int64(1), nil
+			}
+			return int64(0), nil
 		default:
 			return nil, fmt.Errorf("无法转换为int: %T", args[0])
 		}

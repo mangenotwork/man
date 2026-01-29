@@ -22,6 +22,7 @@ const (
 	// 标识符和字面量
 	TokenIdent
 	TokenInt
+	TokenFloat
 	TokenString
 	TokenBool
 
@@ -73,6 +74,7 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenEOF:       "EOF",
 	TokenIdent:     "IDENT",
 	TokenInt:       "INT",
+	TokenFloat:     "FLOAT",
 	TokenString:    "STRING",
 	TokenBool:      "BOOL",
 	TokenAssign:    "=",
@@ -312,8 +314,23 @@ func (l *Lexer) NextToken() Token {
 		tok.Literal = l.readString()
 		log.Printf("读取到字符串: '%s'", tok.Literal)
 	case '.':
-		tok.Type = TokenDot
-		tok.Literal = string(l.ch)
+		// 检查是否是浮点数的一部分
+		if isDigit(l.ch) || (l.ch == '.' && isDigit(l.peekChar())) {
+			// 读取数字，可能是整数或浮点数
+			number := l.readNumber()
+			// 检查是否包含小数点
+			if strings.Contains(number, ".") {
+				tok.Type = TokenFloat
+				tok.Literal = number
+			} else {
+				tok.Type = TokenInt
+				tok.Literal = number
+			}
+		} else {
+			// 这是链式调用操作符
+			tok.Type = TokenDot
+			tok.Literal = string(l.ch)
+		}
 	case 0:
 		tok.Type = TokenEOF
 		tok.Literal = ""
@@ -389,7 +406,56 @@ func (l *Lexer) readNumber() string {
 	for isDigit(l.ch) {
 		l.readChar()
 	}
+
+	// 检查是否有小数点
+	if l.ch == '.' {
+		// 读取小数点
+		l.readChar()
+		// 读取小数部分
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+		return l.input[position:l.position]
+	}
+
+	// 读取整数部分
+	for isDigit(l.ch) {
+		l.readChar()
+	}
+
+	// 检查是否有小数点
+	if l.ch == '.' && isDigit(l.peekChar()) {
+		// 读取小数点
+		l.readChar()
+		// 读取小数部分
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+
 	return l.input[position:l.position]
+}
+
+func (l *Lexer) readFloat() string {
+	position := l.position
+
+	// 如果以小数点开头，添加前导0
+	if l.ch == '.' {
+		l.readChar()
+	}
+
+	// 读取小数部分
+	for isDigit(l.ch) {
+		l.readChar()
+	}
+
+	number := l.input[position:l.position]
+	// 如果以小数点开头，添加前导0
+	if number[0] == '.' {
+		number = "0" + number
+	}
+
+	return number
 }
 
 func (l *Lexer) readString() string {
