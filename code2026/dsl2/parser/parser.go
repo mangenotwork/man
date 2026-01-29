@@ -1255,8 +1255,11 @@ func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
 		case lexer.TokenLBracket:
 			// 下标表达式
 			expr = p.parseIndex(expr)
+		case lexer.TokenDot:
+			// 链式调用
+			expr = p.parseChainCall(expr)
 		default:
-			// 既不是调用也不是下标，返回当前表达式
+			// 既不是调用也不是下标也不是链式，返回当前表达式
 			return expr
 		}
 	}
@@ -1413,4 +1416,80 @@ func (p *Parser) parseDictLiteral() *ast.Dict {
 	}
 
 	return dict
+}
+
+func (p *Parser) parseChainCall(left ast.Expression) ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	// 创建一个链式调用节点
+	chain := &ast.ChainCallExpr{
+		StartPos: left.Pos(),
+		Calls:    make([]*ast.CallExpr, 0),
+	}
+
+	// 首先，检查左边是否已经是链式调用
+	if existingChain, ok := left.(*ast.ChainCallExpr); ok {
+		// 如果左边已经是链式调用，复用它的调用列表
+		chain.Calls = existingChain.Calls
+	} else if call, ok := left.(*ast.CallExpr); ok {
+		// 如果左边是单个调用，添加到链中
+		chain.Calls = append(chain.Calls, call)
+	} else {
+		// 左边是其他表达式，无法进行链式调用
+		p.errors = append(p.errors, "链式调用必须以函数调用开始")
+		return nil
+	}
+
+	// 解析链式调用的每个部分
+	for p.curTokenIs(lexer.TokenDot) {
+		p.nextToken() // 跳过点号
+
+		// 解析标识符（函数名）
+		if !p.curTokenIs(lexer.TokenIdent) {
+			p.errors = append(p.errors, "期望函数名")
+			return nil
+		}
+
+		// 创建标识符
+		ident := &ast.Identifier{
+			StartPos: ast.Position{
+				Line:   p.curTok.Line,
+				Column: p.curTok.Column,
+			},
+			Name: p.curTok.Literal,
+		}
+		p.nextToken() // 跳过标识符
+
+		// 期望左括号
+		if !p.curTokenIs(lexer.TokenLParen) {
+			p.errors = append(p.errors, "链式调用期望函数调用")
+			return nil
+		}
+
+		// 解析函数调用
+		call := p.parseCall(ident)
+		if call == nil {
+			return nil
+		}
+
+		// 将调用添加到链中
+		if callExpr, ok := call.(*ast.CallExpr); ok {
+			chain.Calls = append(chain.Calls, callExpr)
+		} else {
+			p.errors = append(p.errors, "链式调用中的元素必须是函数调用")
+			return nil
+		}
+	}
+
+	// 如果只有一个调用，直接返回它
+	if len(chain.Calls) == 1 {
+		return chain.Calls[0]
+	}
+
+	return chain
 }

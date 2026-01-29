@@ -52,6 +52,7 @@ const (
 	TokenRBrace    // }
 	TokenLBracket  // [
 	TokenRBracket  // ]
+	TokenDot       // .
 
 	// 关键字
 	TokenVar
@@ -98,6 +99,7 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenRBrace:    "}",
 	TokenLBracket:  "[",
 	TokenRBracket:  "]",
+	TokenDot:       ".",
 	TokenVar:       "var",
 	TokenIf:        "if",
 	TokenElse:      "else",
@@ -309,6 +311,9 @@ func (l *Lexer) NextToken() Token {
 		tok.Type = TokenString
 		tok.Literal = l.readString()
 		log.Printf("读取到字符串: '%s'", tok.Literal)
+	case '.':
+		tok.Type = TokenDot
+		tok.Literal = string(l.ch)
 	case 0:
 		tok.Type = TokenEOF
 		tok.Literal = ""

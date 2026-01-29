@@ -350,3 +350,19 @@ func (a *IndexAssignStmt) String() string {
 	return fmt.Sprintf("%s = %s", a.Target.String(), a.Expr.String())
 }
 func (a *IndexAssignStmt) stmtNode() {}
+
+// ChainCallExpr 链式调用表达式
+type ChainCallExpr struct {
+	StartPos Position
+	Calls    []*CallExpr // 调用链中的函数调用
+}
+
+func (c *ChainCallExpr) Pos() Position { return c.StartPos }
+func (c *ChainCallExpr) String() string {
+	calls := make([]string, len(c.Calls))
+	for i, call := range c.Calls {
+		calls[i] = call.String()
+	}
+	return strings.Join(calls, ".")
+}
+func (c *ChainCallExpr) exprNode() {}

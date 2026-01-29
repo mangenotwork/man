@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strings"
 )
 
 // Value 值接口
@@ -189,6 +190,10 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 	case *ast.Dict: // 添加字典字面量求值
 		log.Println("evaluateExpr ast.Dict ==> ", e)
 		return i.evaluateDict(e, ctx, hang)
+
+	case *ast.ChainCallExpr: // 添加链式调用求值
+		log.Println("evaluateExpr ast.ChainCallExpr ==> ", e)
+		return i.evaluateChainCall(e, ctx, hang)
 
 	default:
 		log.Println("[Crash]len:", hang, " | ", fmt.Errorf("不支持的表达式类型: %T", expr))
@@ -797,18 +802,30 @@ func (i *Interpreter) greater(left, right Value) bool {
 func (i *Interpreter) registerBuiltins() {
 	// 打印函数
 	i.global.SetFunc("print", func(args []Value) (Value, error) {
-		for _, arg := range args {
-			fmt.Print(arg, " ")
+		if len(args) == 0 {
+			fmt.Println()
+			return nil, nil
+		}
+
+		// 打印所有参数
+		for i, arg := range args {
+			if i > 0 {
+				fmt.Print(" ")
+			}
+			fmt.Print(arg)
 		}
 		fmt.Println()
+
+		// 为了支持链式调用，返回最后一个参数
+		// 如果没有参数，返回 nil
+		if len(args) > 0 {
+			return args[len(args)-1], nil
+		}
 		return nil, nil
 	})
 
 	i.global.SetFunc("println", func(args []Value) (Value, error) {
-		for _, arg := range args {
-			fmt.Println(arg)
-		}
-		return nil, nil
+		return i.global.functions["print"](args)
 	})
 
 	// 类型转换
@@ -948,6 +965,31 @@ func (i *Interpreter) registerBuiltins() {
 		delete(dict, args[1])
 		return nil, nil
 	})
+
+	i.global.SetFunc("upper", func(args []Value) (Value, error) {
+		if len(args) == 0 {
+			return "", nil
+		}
+
+		// 将参数转换为字符串并转为大写
+		str := fmt.Sprintf("%v", args[0])
+		return strings.ToUpper(str), nil
+	})
+
+	i.global.SetFunc("repeat", func(args []Value) (Value, error) {
+		if len(args) < 2 {
+			return "", fmt.Errorf("repeat 需要两个参数: 字符串和次数")
+		}
+
+		str := fmt.Sprintf("%v", args[0])
+		count, ok := args[1].(int64)
+		if !ok {
+			return "", fmt.Errorf("repeat 的第二个参数必须是整数")
+		}
+
+		return strings.Repeat(str, int(count)), nil
+	})
+
 }
 
 func (i *Interpreter) evaluateList(list *ast.List, ctx *Context, hang int) Value {
@@ -1088,4 +1130,54 @@ func (i *Interpreter) evaluateIndexAssignStmt(stmt *ast.IndexAssignStmt, ctx *Co
 	}
 
 	return value
+}
+
+func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, hang int) Value {
+	log.Println("evaluateChainCall ==> ", chain)
+
+	// 存储前一个函数调用的返回值
+	var lastResult Value = nil
+
+	// 按顺序执行链式调用中的每个函数
+	for callIndex, call := range chain.Calls {
+		log.Printf("执行链式调用第 %d 个函数: %s", callIndex+1, call.Function.Name)
+
+		// 获取函数
+		fn, ok := ctx.GetFunc(call.Function.Name)
+		if !ok {
+			i.errors = append(i.errors, fmt.Errorf("未定义的函数: %s", call.Function.Name))
+			return nil
+		}
+
+		// 准备参数
+		args := make([]Value, len(call.Args))
+		for argIdx, arg := range call.Args {
+			args[argIdx] = i.evaluateExpr(arg, ctx, hang)
+		}
+
+		// 如果是链式调用的第一个函数，正常调用
+		// 如果是后续函数，将前一个函数的结果作为第一个参数传递
+		if callIndex > 0 && lastResult != nil {
+			// 将前一个结果作为第一个参数
+			newArgs := make([]Value, len(args)+1)
+			newArgs[0] = lastResult
+			copy(newArgs[1:], args)
+			args = newArgs
+			log.Printf("管道传递: 前一个结果 %v 作为 %s 的第一个参数", lastResult, call.Function.Name)
+		}
+
+		// 执行函数
+		result, err := fn(args)
+		if err != nil {
+			i.errors = append(i.errors, fmt.Errorf("链式调用错误 %s: %v", call.Function.Name, err))
+			return nil
+		}
+
+		// 保存结果，供下一个函数使用
+		lastResult = result
+		log.Printf("函数 %s 返回: %v", call.Function.Name, result)
+	}
+
+	// 返回最后一个函数的结果
+	return lastResult
 }

@@ -323,9 +323,13 @@ print("嵌套结构 = ", complex["scores"]["Alice"])  // 输出: 95
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-var a = 1
-print("[\"a\"] = ", a)
-chrome init prot=123 proty="127.0.0.1"
+print("aa").print("bb")
+print("hello").upper().print()
+print("hi").repeat(3).print()
+var x = "test"
+print(x).upper().repeat(2).print()
+var list = [1, 2, 3]
+print(list).print(len(list))
 `
 
 	/*
