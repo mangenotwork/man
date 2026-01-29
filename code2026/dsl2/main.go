@@ -324,16 +324,17 @@ func runExample2() {
 	// 一个简单的示例脚本
 	script := `
 var a = 1
-print("[\"a\"] = ", 1)
+print("[\"a\"] = ", a)
+chrome init prot=123 proty="127.0.0.1"
 `
 
 	/*
 
-		bug1 :  print("dict["a"] = ", dict["a"])    报错，语法没过 , 错误定位是 "dict[\"a\"] = " 被当成Token在处理
 
 
 
-	*/
+
+	 */
 
 	fmt.Println("执行示例脚本:")
 	fmt.Println("======================================")

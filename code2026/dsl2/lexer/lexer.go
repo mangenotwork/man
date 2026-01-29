@@ -308,6 +308,7 @@ func (l *Lexer) NextToken() Token {
 	case '"':
 		tok.Type = TokenString
 		tok.Literal = l.readString()
+		log.Printf("读取到字符串: '%s'", tok.Literal)
 	case 0:
 		tok.Type = TokenEOF
 		tok.Literal = ""
@@ -391,7 +392,19 @@ func (l *Lexer) readString() string {
 
 	for {
 		l.readChar()
-		if l.ch == '"' || l.ch == 0 {
+
+		if l.ch == 0 {
+			// 文件结束
+			break
+		}
+
+		if l.ch == '\\' {
+			// 跳过转义字符和它后面的字符
+			l.readChar()
+			continue
+		}
+
+		if l.ch == '"' {
 			break
 		}
 	}
