@@ -469,32 +469,66 @@ func (l *Lexer) readString() string {
 			break
 		}
 
+		if l.ch == '"' {
+			break
+		}
+
 		if l.ch == '\\' {
 			// 跳过转义字符和它后面的字符
 			l.readChar()
 			continue
 		}
 
-		if l.ch == '"' {
-			break
-		}
 	}
 
 	if l.ch == '"' {
 		// 正常结束，有右引号
 		str := l.input[position:l.position]
-
-		// 处理转义字符
-		str = strings.ReplaceAll(str, "\\n", "\n")
-		str = strings.ReplaceAll(str, "\\t", "\t")
-		str = strings.ReplaceAll(str, "\\\"", "\"")
-		str = strings.ReplaceAll(str, "\\\\", "\\")
-
-		return str
+		return unescapeString(str)
 	}
 
 	// 字符串没有正确结束
 	return l.input[position:l.position]
+}
+
+func unescapeString(s string) string {
+	var result strings.Builder
+	result.Grow(len(s))
+
+	for i := 0; i < len(s); {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++ // 跳过反斜杠
+
+			// 只处理这些特定的转义序列
+			switch s[i] {
+			case '\\':
+				result.WriteByte('\\')
+			case '"':
+				result.WriteByte('"')
+			case 'n':
+				result.WriteByte('\n')
+			case 't':
+				result.WriteByte('\t')
+			case 'r':
+				result.WriteByte('\r')
+			case '0':
+				result.WriteByte('\x00')
+			default:
+				// 关键：对于 \t, \n 等，如果不是转义序列的一部分
+				// 应该保持为 \t, \n
+				// 所以写回反斜杠和字符
+				result.WriteByte('\\')
+				result.WriteByte(s[i])
+			}
+
+		} else {
+			result.WriteByte(s[i])
+
+		}
+		i++
+	}
+
+	return result.String()
 }
 
 func (l *Lexer) lookupIdent(ident string) TokenType {

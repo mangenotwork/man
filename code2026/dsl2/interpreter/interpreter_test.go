@@ -651,18 +651,20 @@ func TestStringLiteral(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{`"Hello World!"`, "Hello World!"},
-		{`"测试中文"`, "测试中文"},
-		{`"escaped \"quote\""`, "escaped \"quote\""},
-		{`"line\nbreak"`, "line\nbreak"},
-		{`"tab\ttab"`, "tab\ttab"},
-		{`"backslash\\test"`, "backslash\\test"},
-		{`"multiple\nlines\ttest"`, "multiple\nlines\ttest"},
+		{`return "Hello World!"`, "Hello World!"},
+		{`return "测试中文"`, "测试中文"},
+		{`return "escaped \"quote\""`, "escaped \"quote\""},
+		{`return "line\nbreak"`, "line\nbreak"},
+		{`return "tab\ttab"`, "tab\ttab"},
+		{`return "backslash\\test"`, "backslash\\test"},
+		{`return "multiple\nlines\ttest"`, "multiple\nlines\ttest"},
 	}
 
-	for _, tt := range tests {
-		evaluated := testEval(tt.input, t)
-		testStringObject(t, evaluated, tt.expected)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			evaluated := testEval(tt.input, t)
+			testStringObject(t, evaluated, tt.expected)
+		})
 	}
 }
 
