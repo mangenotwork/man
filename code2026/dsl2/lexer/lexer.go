@@ -166,6 +166,8 @@ func (l *Lexer) readChar() {
 		l.line++
 		l.column = 0
 	}
+	logger.Debug("readChar: 后: ch=%v, position=%d, readPosition=%d",
+		l.ch, l.position, l.readPosition)
 }
 
 func (l *Lexer) peekChar() rune {
@@ -194,26 +196,37 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = TokenEQ
 			tok.Literal = "=="
 		} else {
-			// 检查前面是否有标识符
-			// 如果前面是标识符字符，则 = 应该属于标识符的一部分
-			if l.position > 0 && (isLetter(rune(l.input[l.position-1])) || isDigit(rune(l.input[l.position-1])) ||
-				l.input[l.position-1] == '_' || l.input[l.position-1] == '"') {
-				// 回退一个字符，然后读取整个标识符
-				l.position--
-				l.readPosition--
-				l.column--
-				l.ch = rune(l.input[l.position])
+			logger.Debug("TokenEQ !! ")
 
-				// 读取整个标识符（包含 = 和后面的值）
-				tok.Literal = l.readIdentifier()
-				tok.Type = l.lookupIdent(tok.Literal)
-				return tok
-			} else {
-				logger.Debug("TokenAssign")
-				tok.Type = TokenAssign
-				tok.Literal = string(l.ch)
-			}
+			//// 检查前面是否有标识符
+			//// 如果前面是标识符字符，则 = 应该属于标识符的一部分
+			//if l.position > 0 && (isLetter(rune(l.input[l.position-1])) || isDigit(rune(l.input[l.position-1])) ||
+			//	l.input[l.position-1] == '_' || l.input[l.position-1] == '"') {
+			//
+			//	logger.Debug("回退一个字符，然后读取整个标识符 ")
+			//	// 回退一个字符，然后读取整个标识符
+			//	l.position--
+			//	l.readPosition--
+			//	l.column--
+			//	l.ch = rune(l.input[l.position])
+			//
+			//	// 读取整个标识符（包含 = 和后面的值）
+			//	tok.Literal = l.readIdentifier()
+			//	logger.Debug("tok.Literal = ", tok.Literal)
+			//	tok.Type = l.lookupIdent(tok.Literal)
+			//	return tok
+			//} else {
+			//	logger.Debug("TokenAssign")
+			//	tok.Type = TokenAssign
+			//	tok.Literal = string(l.ch)
+			//}
 
+			logger.Debug("TokenAssign")
+			tok.Type = TokenAssign
+			tok.Literal = string(l.ch)
+
+			//l.readChar() // 关键：读取下一个字符
+			//return tok
 		}
 	case '+':
 		tok.Type = TokenPlus
@@ -373,6 +386,7 @@ func (l *Lexer) readIdentifier() string {
 		// 允许的字符：字母、数字、下划线、等号、点、冒号、减号
 		if isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
+
 		} else if l.ch == '"' {
 			// 处理带引号的部分
 			l.readChar() // 读取引号

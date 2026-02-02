@@ -183,7 +183,7 @@ func registerUtils(interp *interpreter.Interpreter) {
 
 func registerCore(interp *interpreter.Interpreter) {
 	interp.Global().SetFunc("chrome", func(args []interpreter.Value) (interpreter.Value, error) {
-		log.Println("执行 chrome 的操作，参数是 ", args)
+		log.Println("执行 chrome 的操作，参数是 ", args, len(args))
 		return nil, nil
 	})
 }

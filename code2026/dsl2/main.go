@@ -347,10 +347,7 @@ s.print()
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-var s = "test"
-s.print()
-"case2 test".upper().print()
-upper("case3").repeat(2).print()
+chrome init prot=123 proty="127.0.0.1"
 `
 
 	fmt.Println("执行示例脚本:")
