@@ -709,7 +709,7 @@ func (p *Parser) parseExpression() ast.Expression {
 		return nil
 	}
 
-	logger.Debug("parseExpression = ", p.curTok)
+	logger.Debug("parseExpression: 开始解析表达式，当前token: %v", p.curTok)
 
 	p.enter()
 	defer p.leave()
@@ -717,11 +717,12 @@ func (p *Parser) parseExpression() ast.Expression {
 	expr := p.parseLogicalOr()
 	if expr == nil {
 		// 解析失败，尝试跳过当前token
-		logger.Debug("parseExpression: 解析失败，跳过token:", p.curTok)
+		logger.Debug("parseExpression: 解析失败，跳过token: %v", p.curTok)
 		p.nextToken()
 		return nil
 	}
 
+	logger.Debug("parseExpression: 解析结果: %T(%v)", expr, expr)
 	return expr
 }
 
@@ -1026,15 +1027,15 @@ func (p *Parser) parseIdentifierOrCall() ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	logger.Debug("parseIdentifierOrCall: 当前token: %v", p.curTok)
+
 	// 保存标识符位置
 	line := p.curTok.Line
 	column := p.curTok.Column
 	name := p.curTok.Literal
 
-	p.nextToken()
-
-	// 现在只返回标识符，调用和下标在 parsePostfix 中处理
-	return &ast.Identifier{
+	// 创建标识符
+	ident := &ast.Identifier{
 		StartPos: ast.Position{
 			Line:   line,
 			Column: column,
@@ -1042,65 +1043,12 @@ func (p *Parser) parseIdentifierOrCall() ast.Expression {
 		Name: name,
 	}
 
-	//// 检查是否是函数调用
-	//if p.curTokenIs(lexer.TokenLParen) {
-	//	p.nextToken() // 跳过 (
-	//
-	//	var args []ast.Expression
-	//
-	//	// 解析参数列表
-	//	if !p.curTokenIs(lexer.TokenRParen) {
-	//		for {
-	//
-	//			// 解析参数
-	//			arg := p.parseExpression()
-	//			log.Println("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
-	//			if arg != nil {
-	//				args = append(args, arg)
-	//			} else {
-	//				// 参数解析失败
-	//				break
-	//			}
-	//			//log.Println(p.curTok.Type)
-	//			// 检查是否有更多参数
-	//			if p.curTokenIs(lexer.TokenComma) {
-	//				p.nextToken() // 跳过逗号
-	//				continue
-	//			}
-	//
-	//			break
-	//		}
-	//	}
-	//
-	//	// 期望右括号
-	//	if !p.expect(lexer.TokenRParen, "函数调用参数列表后") {
-	//		return nil
-	//	}
-	//
-	//	return &ast.CallExpr{
-	//		StartPos: ast.Position{
-	//			Line:   line,
-	//			Column: column,
-	//		},
-	//		Function: &ast.Identifier{
-	//			StartPos: ast.Position{
-	//				Line:   line,
-	//				Column: column,
-	//			},
-	//			Name: name,
-	//		},
-	//		Args: args,
-	//	}
-	//}
-	//
-	//// 不是函数调用，返回标识符
-	//return &ast.Identifier{
-	//	StartPos: ast.Position{
-	//		Line:   line,
-	//		Column: column,
-	//	},
-	//	Name: name,
-	//}
+	// 跳过标识符
+	p.nextToken()
+
+	logger.Debug("parseIdentifierOrCall: 返回标识符: %s", name)
+	return ident
+
 }
 
 func (p *Parser) parseInteger() ast.Expression {
@@ -1276,13 +1224,17 @@ func (p *Parser) parseCallOrIndex() ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	logger.Debug("parseCallOrIndex: 开始")
+
 	// 先解析基本表达式
 	expr := p.parsePrimary()
 	if expr == nil {
 		return nil
 	}
 
-	// 处理后续的调用或下标
+	logger.Debug("parseCallOrIndex: 基本表达式: %T(%v)", expr, expr)
+
+	// 处理后续的调用、下标或链式调用
 	return p.parsePostfix(expr)
 }
 
@@ -1294,40 +1246,44 @@ func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
-	// 检查当前token是否是点号，并且前一个表达式不是数字
-	// 这样可以防止 1.5 被解析为链式调用
-	if p.curTokenIs(lexer.TokenDot) {
-		// 检查expr是否是数字字面量
-		switch expr.(type) {
-		case *ast.Integer, *ast.Float:
-			// 数字后面不能跟点号进行链式调用
-			return expr
-		default:
-			return p.parseChainCall(expr)
-		}
-	}
+	logger.Debug("parsePostfix: 开始，expr=%T(%v), curTok=%v", expr, expr, p.curTok)
 
-	// 循环处理多个下标或调用
+	// 循环处理多个下标、调用或链式调用
 	for {
 		switch p.curTok.Type {
 		case lexer.TokenLParen:
 			// 函数调用
 			expr = p.parseCall(expr)
+			logger.Debug("parsePostfix: 解析调用后，expr=%T(%v)", expr, expr)
 		case lexer.TokenLBracket:
 			// 下标表达式
 			expr = p.parseIndex(expr)
 		case lexer.TokenDot:
-			// 再次检查是否是数字
+			// 检查是否是数字字面量的一部分
 			switch expr.(type) {
 			case *ast.Integer, *ast.Float:
-				// 数字后面不能跟点号
-				p.errors = append(p.errors, "数字后面不能使用点号操作符")
-				return nil
+				// 数字后面不能跟点号进行链式调用
+				return expr
 			default:
-				expr = p.parseChainCall(expr)
+				// 这是链式调用的开始
+				// 回退当前token，让parseChainCall重新处理点号
+				// 但实际上我们已经在点号位置，所以直接解析链式调用
+				chain := p.parseChainCall(expr)
+				if chain != nil {
+					expr = chain
+					logger.Debug("parsePostfix: 解析链式调用后，expr=%T(%v)", expr, expr)
+
+					// 检查是否还有后续的点号
+					// 链式调用可能已经处理了多个点号，所以这里要检查
+					continue
+				} else {
+					// 链式调用解析失败
+					return expr
+				}
 			}
 		default:
 			// 既不是调用也不是下标也不是链式，返回当前表达式
+			logger.Debug("parsePostfix: 返回表达式: %T(%v)", expr, expr)
 			return expr
 		}
 	}
@@ -1341,13 +1297,22 @@ func (p *Parser) parseCall(left ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	logger.Debug("parseCall: 开始解析调用，left=%T(%v)", left, left)
+
 	// 检查左边是否是标识符
 	ident, ok := left.(*ast.Identifier)
 	if !ok {
+		// 如果不是标识符，可能是其他表达式
+		// 例如，在链式调用中，left 可能是其他类型的表达式
+		logger.Debug("parseCall: 左边不是标识符: %T", left)
+
+		// 对于非标识符，我们可能无法直接调用
+		// 这里返回一个错误或尝试处理
 		p.errors = append(p.errors, "函数调用必须是标识符")
 		return nil
 	}
 
+	logger.Debug("parseCall: 函数名: %s", ident.Name)
 	p.nextToken() // 跳过 (
 
 	var args []ast.Expression
@@ -1357,14 +1322,14 @@ func (p *Parser) parseCall(left ast.Expression) ast.Expression {
 		for {
 			// 解析参数
 			arg := p.parseExpression()
-			logger.Debug("parseIdentifierOrCall arg = ", arg, p.curTok.Type)
+			logger.Debug("parseCall: 解析参数: %v", arg)
 			if arg != nil {
 				args = append(args, arg)
 			} else {
 				// 参数解析失败
 				break
 			}
-			//log.Println(p.curTok.Type)
+
 			// 检查是否有更多参数
 			if p.curTokenIs(lexer.TokenComma) {
 				p.nextToken() // 跳过逗号
@@ -1389,41 +1354,6 @@ func (p *Parser) parseCall(left ast.Expression) ast.Expression {
 		Args:     args,
 	}
 }
-
-//func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
-//	if !p.checkDepth() {
-//		return nil
-//	}
-//
-//	p.enter()
-//	defer p.leave()
-//
-//	// 保存左表达式的位置
-//	pos := ast.Position{
-//		Line:   p.curTok.Line,
-//		Column: p.curTok.Column,
-//	}
-//
-//	p.nextToken() // 跳过 [
-//
-//	// 解析下标表达式
-//	indexExpr := p.parseExpression()
-//	if indexExpr == nil {
-//		p.errors = append(p.errors, "下标表达式解析失败")
-//		return nil
-//	}
-//
-//	// 期望右括号
-//	if !p.expect(lexer.TokenRBracket, "下标表达式后") {
-//		return nil
-//	}
-//
-//	return &ast.IndexExpr{
-//		StartPos: pos,
-//		Left:     left,
-//		Index:    indexExpr,
-//	}
-//}
 
 func (p *Parser) parseIndex(left ast.Expression) ast.Expression {
 	if !p.checkDepth() {
@@ -1600,70 +1530,179 @@ func (p *Parser) parseChainCall(left ast.Expression) ast.Expression {
 	p.enter()
 	defer p.leave()
 
+	logger.Debug("========= parseChainCall 开始 =========")
+	logger.Debug("左边表达式: %T(%v)", left, left)
+	logger.Debug("当前token: %v", p.curTok)
+
 	// 创建一个链式调用节点
 	chain := &ast.ChainCallExpr{
 		StartPos: left.Pos(),
 		Calls:    make([]*ast.CallExpr, 0),
 	}
 
-	// 首先，检查左边是否已经是链式调用
+	// 处理左边表达式
 	if existingChain, ok := left.(*ast.ChainCallExpr); ok {
 		// 如果左边已经是链式调用，复用它的调用列表
 		chain.Calls = existingChain.Calls
-	} else if call, ok := left.(*ast.CallExpr); ok {
-		// 如果左边是单个调用，添加到链中
-		chain.Calls = append(chain.Calls, call)
+		logger.Debug("parseChainCall: 复用已有链式调用，包含 %d 个调用", len(chain.Calls))
 	} else {
-		// 左边是其他表达式，无法进行链式调用
-		p.errors = append(p.errors, "链式调用必须以函数调用开始")
-		return nil
+		// 左边不是链式调用
+		// 创建第一个调用（可能是虚拟调用）
+		firstCall := p.createFirstChainCall(left)
+		if firstCall == nil {
+			logger.Debug("parseChainCall: 无法创建第一个调用")
+			return nil
+		}
+		chain.Calls = append(chain.Calls, firstCall)
+		logger.Debug("parseChainCall: 添加第一个调用: %s", firstCall.Function.Name)
+	}
+
+	// 当前token应该是点号（调用者应该已经确保）
+	if !p.curTokenIs(lexer.TokenDot) {
+		logger.Debug("parseChainCall: 当前token不是点号: %v", p.curTok)
+		// 但可能我们只有一个调用
+		if len(chain.Calls) == 1 {
+			// 如果是虚拟调用，返回原始表达式
+			if chain.Calls[0].Function.Name == "_value" {
+				return chain.Calls[0].Args[0]
+			}
+			return chain.Calls[0]
+		}
 	}
 
 	// 解析链式调用的每个部分
 	for p.curTokenIs(lexer.TokenDot) {
-		p.nextToken() // 跳过点号
+		logger.Debug("parseChainCall: 处理点号")
 
-		// 解析标识符（函数名）
+		// 跳过当前点号
+		p.nextToken()
+		logger.Debug("parseChainCall: 跳过了点号，当前token: %v", p.curTok)
+
+		// 解析方法名
 		if !p.curTokenIs(lexer.TokenIdent) {
-			p.errors = append(p.errors, "期望函数名")
+			p.errors = append(p.errors, "期望方法名")
 			return nil
 		}
 
-		// 创建标识符
-		ident := &ast.Identifier{
+		methodName := p.curTok.Literal
+		logger.Debug("parseChainCall: 方法名: %s", methodName)
+
+		// 创建方法标识符
+		methodIdent := &ast.Identifier{
 			StartPos: ast.Position{
 				Line:   p.curTok.Line,
 				Column: p.curTok.Column,
 			},
-			Name: p.curTok.Literal,
+			Name: methodName,
 		}
-		p.nextToken() // 跳过标识符
 
-		// 期望左括号
+		// 跳过方法名
+		p.nextToken()
+
+		// 检查是否有括号
 		if !p.curTokenIs(lexer.TokenLParen) {
-			p.errors = append(p.errors, "链式调用期望函数调用")
+			p.errors = append(p.errors, "期望 '(' 开始方法调用")
 			return nil
 		}
 
-		// 解析函数调用
-		call := p.parseCall(ident)
-		if call == nil {
+		// 解析方法调用
+		methodCall := p.parseCall(methodIdent)
+		if methodCall == nil {
+			logger.Debug("parseChainCall: 方法调用解析失败")
 			return nil
 		}
 
-		// 将调用添加到链中
-		if callExpr, ok := call.(*ast.CallExpr); ok {
+		// 添加到链中
+		if callExpr, ok := methodCall.(*ast.CallExpr); ok {
 			chain.Calls = append(chain.Calls, callExpr)
+			logger.Debug("parseChainCall: 添加方法调用: %s", callExpr.Function.Name)
 		} else {
 			p.errors = append(p.errors, "链式调用中的元素必须是函数调用")
 			return nil
 		}
+
+		logger.Debug("parseChainCall: 当前链有 %d 个调用", len(chain.Calls))
 	}
 
 	// 如果只有一个调用，直接返回它
 	if len(chain.Calls) == 1 {
+		logger.Debug("parseChainCall: 只有一个调用，直接返回")
+		// 如果是虚拟调用，返回原始表达式
+		if chain.Calls[0].Function.Name == "_value" {
+			return chain.Calls[0].Args[0]
+		}
 		return chain.Calls[0]
 	}
 
+	logger.Debug("parseChainCall: 返回链式调用，包含 %d 个调用", len(chain.Calls))
 	return chain
+}
+
+// 创建链式调用的第一个调用
+func (p *Parser) createFirstChainCall(expr ast.Expression) *ast.CallExpr {
+	logger.Debug("createFirstChainCall: expr=%T(%v)", expr, expr)
+
+	switch v := expr.(type) {
+	case *ast.CallExpr:
+		// 已经是函数调用
+		return v
+	case *ast.Identifier:
+		// 标识符（变量），创建虚拟调用
+		return &ast.CallExpr{
+			StartPos: v.Pos(),
+			Function: &ast.Identifier{
+				StartPos: v.Pos(),
+				Name:     "_value",
+			},
+			Args: []ast.Expression{v},
+		}
+	case *ast.String, *ast.Integer, *ast.Float, *ast.Boolean:
+		// 字面量，创建虚拟调用
+		return &ast.CallExpr{
+			StartPos: v.Pos(),
+			Function: &ast.Identifier{
+				StartPos: v.Pos(),
+				Name:     "_value",
+			},
+			Args: []ast.Expression{v},
+		}
+	default:
+		// 其他表达式，也创建虚拟调用
+		return &ast.CallExpr{
+			StartPos: v.Pos(),
+			Function: &ast.Identifier{
+				StartPos: v.Pos(),
+				Name:     "_value",
+			},
+			Args: []ast.Expression{v},
+		}
+	}
+}
+
+// 解析方法调用
+func (p *Parser) parseMethodCall(methodName string) ast.Expression {
+	// 期望当前位置是左括号
+	if !p.curTokenIs(lexer.TokenLParen) {
+		p.errors = append(p.errors, "期望 '(' 开始方法调用")
+		return nil
+	}
+
+	// 创建方法名标识符
+	methodIdent := &ast.Identifier{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		Name: methodName,
+	}
+
+	// 解析调用
+	return p.parseCall(methodIdent)
+}
+
+// 将表达式转换为调用表达式
+func (p *Parser) convertToCallExpr(expr ast.Expression) *ast.CallExpr {
+	// 对于简单情况，如果表达式是标识符，但还没有被处理
+	// 这里需要根据你的语法进行调整
+	return nil
 }

@@ -371,8 +371,7 @@ func (l *Lexer) readIdentifier() string {
 
 	for {
 		// 允许的字符：字母、数字、下划线、等号、点、冒号、减号
-		if isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || l.ch == '=' ||
-			l.ch == '.' || l.ch == '-' || l.ch == ':' || l.ch == '/' || l.ch == '\\' {
+		if isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
 		} else if l.ch == '"' {
 			// 处理带引号的部分

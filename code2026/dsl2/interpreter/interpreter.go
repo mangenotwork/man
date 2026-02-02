@@ -1143,49 +1143,87 @@ func (i *Interpreter) evaluateIndexAssignStmt(stmt *ast.IndexAssignStmt, ctx *Co
 func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, hang int) Value {
 	logger.Debug("evaluateChainCall ==> ", chain)
 
-	// 存储前一个函数调用的返回值
+	// 存储前一个调用的结果
 	var lastResult Value = nil
 
-	// 按顺序执行链式调用中的每个函数
+	// 遍历所有调用
 	for callIndex, call := range chain.Calls {
-		logger.Debug("执行链式调用第 %d 个函数: %s", callIndex+1, call.Function.Name)
+		logger.Debug("执行链式调用第 %d 个调用: %s", callIndex+1, call.Function.Name)
 
-		// 获取函数
-		fn, ok := ctx.GetFunc(call.Function.Name)
-		if !ok {
-			i.errors = append(i.errors, fmt.Errorf("未定义的函数: %s", call.Function.Name))
-			return nil
-		}
+		// 处理第一个调用
+		if callIndex == 0 {
+			// 检查是否是特殊标记 "_value"
+			if call.Function.Name == "_value" {
+				// 这是值包装，直接取值
+				if len(call.Args) == 1 {
+					lastResult = i.evaluateExpr(call.Args[0], ctx, hang)
+					logger.Debug("第一个是值: %v", lastResult)
+				} else {
+					i.errors = append(i.errors, fmt.Errorf("值包装应该有1个参数，得到 %d 个", len(call.Args)))
+					return nil
+				}
+			} else {
+				// 普通函数调用
+				fn, ok := ctx.GetFunc(call.Function.Name)
+				if !ok {
+					// 可能是变量
+					if val, ok := ctx.GetVar(call.Function.Name); ok {
+						lastResult = val
+						logger.Debug("第一个是变量 %s: %v", call.Function.Name, lastResult)
+					} else {
+						i.errors = append(i.errors, fmt.Errorf("未定义的函数或变量: %s", call.Function.Name))
+						return nil
+					}
+				} else {
+					// 准备参数
+					args := make([]Value, len(call.Args))
+					for argIdx, arg := range call.Args {
+						args[argIdx] = i.evaluateExpr(arg, ctx, hang)
+					}
 
-		// 准备参数
-		args := make([]Value, len(call.Args))
-		for argIdx, arg := range call.Args {
-			args[argIdx] = i.evaluateExpr(arg, ctx, hang)
-		}
+					// 执行函数
+					result, err := fn(args)
+					if err != nil {
+						i.errors = append(i.errors, fmt.Errorf("链式调用错误 %s: %v", call.Function.Name, err))
+						return nil
+					}
 
-		// 如果是链式调用的第一个函数，正常调用
-		// 如果是后续函数，将前一个函数的结果作为第一个参数传递
-		if callIndex > 0 && lastResult != nil {
+					lastResult = result
+					logger.Debug("函数 %s 返回: %v", call.Function.Name, result)
+				}
+			}
+		} else {
+			// 后续调用必须是函数
+			fn, ok := ctx.GetFunc(call.Function.Name)
+			if !ok {
+				i.errors = append(i.errors, fmt.Errorf("未定义的函数: %s", call.Function.Name))
+				return nil
+			}
+
+			// 准备参数
+			args := make([]Value, len(call.Args))
+			for argIdx, arg := range call.Args {
+				args[argIdx] = i.evaluateExpr(arg, ctx, hang)
+			}
+
 			// 将前一个结果作为第一个参数
 			newArgs := make([]Value, len(args)+1)
 			newArgs[0] = lastResult
 			copy(newArgs[1:], args)
-			args = newArgs
-			logger.Debug("管道传递: 前一个结果 %v 作为 %s 的第一个参数", lastResult, call.Function.Name)
-		}
 
-		// 执行函数
-		result, err := fn(args)
-		if err != nil {
-			i.errors = append(i.errors, fmt.Errorf("链式调用错误 %s: %v", call.Function.Name, err))
-			return nil
-		}
+			logger.Debug("调用 %s 参数: %v", call.Function.Name, newArgs)
 
-		// 保存结果，供下一个函数使用
-		lastResult = result
-		logger.Debug("函数 %s 返回: %v", call.Function.Name, result)
+			// 执行函数
+			result, err := fn(newArgs)
+			if err != nil {
+				i.errors = append(i.errors, fmt.Errorf("链式调用错误 %s: %v", call.Function.Name, err))
+				return nil
+			}
+
+			lastResult = result
+			logger.Debug("函数 %s 返回: %v", call.Function.Name, result)
+		}
 	}
 
-	// 返回最后一个函数的结果
 	return lastResult
 }

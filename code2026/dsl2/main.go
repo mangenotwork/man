@@ -6,6 +6,7 @@ import (
 	"dsl2/builtins"
 	"dsl2/interpreter"
 	"dsl2/lexer"
+	"dsl2/logger"
 	"dsl2/parser"
 	"fmt"
 	"log"
@@ -15,28 +16,28 @@ import (
 
 func main() {
 
-	//logger.IsDebug = true
+	logger.IsDebug = true
 
-	fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
-	fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
-	fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
-	fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
-	fmt.Println("输入代码并按回车执行，按Ctrl+Z(Windows)退出")
-	fmt.Println("使用 'exit' 或 'quit' 命令退出程序")
-	fmt.Println("===================================================================")
-
-	runREPL()
-
-	//if len(os.Args) < 2 {
-	//	// 如果没有参数，使用示例脚本
+	//fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
+	//fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
+	//fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
+	//fmt.Printf("欢迎使用 漫语言 v%s\n", VERSION)
+	//fmt.Println("输入代码并按回车执行，按Ctrl+Z(Windows)退出")
+	//fmt.Println("使用 'exit' 或 'quit' 命令退出程序")
+	//fmt.Println("===================================================================")
 	//
-	//	//log.Println("所有示例测试")
-	//	//runExample()
-	//	//log.Println("所有示例测试完成 .......")
-	//
-	//	runExample2()
-	//	return
-	//}
+	//runREPL()
+
+	if len(os.Args) < 2 {
+		// 如果没有参数，使用示例脚本
+
+		//log.Println("所有示例测试")
+		//runExample()
+		//log.Println("所有示例测试完成 .......")
+
+		runExample2()
+		return
+	}
 	//
 	//filename := os.Args[1]
 	//source, err := ioutil.ReadFile(filename)
@@ -332,14 +333,24 @@ var complex = {
 print("嵌套结构 = ", complex["users"][0])    // 输出: Alice
 print("嵌套结构 = ", complex["scores"]["Alice"])  // 输出: 95
 
+var s = "test";
+var s1 = upper(s).repeat(2)
+print(s1)
+
+
+bug:
+var s = "test"
+s.print()
+
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-var s = "test"; 
-var s1 = upper(s).repeat(2)
-print(s1)
+var s = "test"
+s.print()
+"case2 test".upper().print()
+upper("case3").repeat(2).print()
 `
 
 	fmt.Println("执行示例脚本:")
