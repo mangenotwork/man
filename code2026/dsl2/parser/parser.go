@@ -502,6 +502,54 @@ func (p *Parser) isEndOfStatement() bool {
 		p.curTokenIs(lexer.TokenRBrace)
 }
 
+//func (p *Parser) parseIfStatement() *ast.IfStmt {
+//	if !p.checkDepth() {
+//		return nil
+//	}
+//
+//	p.enter()
+//	defer p.leave()
+//
+//	stmt := &ast.IfStmt{
+//		StartPos: ast.Position{
+//			Line:   p.curTok.Line,
+//			Column: p.curTok.Column,
+//		},
+//	}
+//
+//	p.expect(lexer.TokenIf, "if语句") // 跳过 if
+//
+//	// 不需要括号，直接解析条件
+//	stmt.Condition = p.parseExpression()
+//	if stmt.Condition == nil {
+//		return nil
+//	}
+//
+//	// 解析 then 块
+//	stmt.Then = p.parseBlockStatement()
+//	if stmt.Then == nil {
+//		return nil
+//	}
+//
+//	// 解析可选的 else
+//	if p.curTokenIs(lexer.TokenElse) || p.curTokenIs(lexer.TokenElif) {
+//		// 记录是 else 还是 elif
+//		tokType := p.curTok.Type
+//
+//		p.nextToken()
+//
+//		if tokType == lexer.TokenElif || p.curTokenIs(lexer.TokenIf) {
+//			// 处理 elif 或 else if
+//			stmt.Else = p.parseIfStatement()
+//		} else {
+//			// 处理 else 块
+//			stmt.Else = p.parseBlockStatement()
+//		}
+//	}
+//
+//	return stmt
+//}
+
 func (p *Parser) parseIfStatement() *ast.IfStmt {
 	if !p.checkDepth() {
 		return nil
@@ -510,6 +558,12 @@ func (p *Parser) parseIfStatement() *ast.IfStmt {
 	p.enter()
 	defer p.leave()
 
+	return p.parseIfOrElifStatement(false)
+}
+
+// parseIfOrElifStatement 解析 if 或 elif 语句
+// isElif 表示当前解析的是否是 elif 分支
+func (p *Parser) parseIfOrElifStatement(isElif bool) *ast.IfStmt {
 	stmt := &ast.IfStmt{
 		StartPos: ast.Position{
 			Line:   p.curTok.Line,
@@ -517,9 +571,12 @@ func (p *Parser) parseIfStatement() *ast.IfStmt {
 		},
 	}
 
-	p.expect(lexer.TokenIf, "if语句") // 跳过 if
+	// 如果不是 elif，跳过 if 关键字
+	if !isElif {
+		p.expect(lexer.TokenIf, "if语句")
+	}
 
-	// 不需要括号，直接解析条件
+	// 解析条件表达式
 	stmt.Condition = p.parseExpression()
 	if stmt.Condition == nil {
 		return nil
@@ -531,13 +588,20 @@ func (p *Parser) parseIfStatement() *ast.IfStmt {
 		return nil
 	}
 
-	// 解析可选的 else
-	if p.curTokenIs(lexer.TokenElse) {
-		p.nextToken()
+	// 解析可选的 else 或 elif
+	if p.curTokenIs(lexer.TokenElse) || p.curTokenIs(lexer.TokenElif) {
+		// 记录当前 token 类型
+		tokType := p.curTok.Type
+		p.nextToken() // 跳过 else 或 elif
 
-		if p.curTokenIs(lexer.TokenIf) {
-			stmt.Else = p.parseIfStatement()
+		if tokType == lexer.TokenElif {
+			// 处理 elif
+			stmt.Else = p.parseIfOrElifStatement(true)
+		} else if p.curTokenIs(lexer.TokenIf) {
+			// 处理 else if
+			stmt.Else = p.parseIfOrElifStatement(false)
 		} else {
+			// 处理 else 块
 			stmt.Else = p.parseBlockStatement()
 		}
 	}

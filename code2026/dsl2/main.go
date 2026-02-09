@@ -348,6 +348,16 @@ func runExample2() {
 	// 一个简单的示例脚本
 	script := `
 chrome init prot=123 proty="127.0.0.1"
+var x = 11
+if x ==1 {
+	print("大于0")
+} elif x == 15 {
+    print("大于5")
+} elif x == 11 {
+    print("大于10")
+} else {
+    print("其他")
+}
 `
 
 	fmt.Println("执行示例脚本:")

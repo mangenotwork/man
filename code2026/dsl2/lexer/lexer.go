@@ -59,6 +59,7 @@ const (
 	TokenVar
 	TokenIf
 	TokenElse
+	TokenElif
 	TokenWhile
 	TokenReturn
 	TokenTrue
@@ -105,6 +106,7 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenVar:       "var",
 	TokenIf:        "if",
 	TokenElse:      "else",
+	TokenElif:      "elif",
 	TokenWhile:     "while",
 	TokenReturn:    "return",
 	TokenTrue:      "true",
@@ -552,6 +554,8 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return TokenIf
 	case "else":
 		return TokenElse
+	case "elif":
+		return TokenElif
 	case "while":
 		return TokenWhile
 	case "return":
