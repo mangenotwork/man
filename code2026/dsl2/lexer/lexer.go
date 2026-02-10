@@ -42,6 +42,8 @@ const (
 	TokenAnd      // &&
 	TokenOr       // ||
 	TokenNot      // !
+	TokenInc      // ++
+	TokenDec      // --
 
 	// 分隔符
 	TokenComma     // ,
@@ -92,6 +94,8 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenGE:        ">=",
 	TokenAnd:       "&&",
 	TokenOr:        "||",
+	TokenInc:       "++",
+	TokenDec:       "--",
 	TokenNot:       "!",
 	TokenComma:     ",",
 	TokenSemicolon: ";",
@@ -198,44 +202,28 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = TokenEQ
 			tok.Literal = "=="
 		} else {
-			logger.Debug("TokenEQ !! ")
-
-			//// 检查前面是否有标识符
-			//// 如果前面是标识符字符，则 = 应该属于标识符的一部分
-			//if l.position > 0 && (isLetter(rune(l.input[l.position-1])) || isDigit(rune(l.input[l.position-1])) ||
-			//	l.input[l.position-1] == '_' || l.input[l.position-1] == '"') {
-			//
-			//	logger.Debug("回退一个字符，然后读取整个标识符 ")
-			//	// 回退一个字符，然后读取整个标识符
-			//	l.position--
-			//	l.readPosition--
-			//	l.column--
-			//	l.ch = rune(l.input[l.position])
-			//
-			//	// 读取整个标识符（包含 = 和后面的值）
-			//	tok.Literal = l.readIdentifier()
-			//	logger.Debug("tok.Literal = ", tok.Literal)
-			//	tok.Type = l.lookupIdent(tok.Literal)
-			//	return tok
-			//} else {
-			//	logger.Debug("TokenAssign")
-			//	tok.Type = TokenAssign
-			//	tok.Literal = string(l.ch)
-			//}
-
 			logger.Debug("TokenAssign")
 			tok.Type = TokenAssign
 			tok.Literal = string(l.ch)
-
-			//l.readChar() // 关键：读取下一个字符
-			//return tok
 		}
 	case '+':
-		tok.Type = TokenPlus
-		tok.Literal = string(l.ch)
+		if l.peekChar() == '+' {
+			l.readChar()
+			tok.Type = TokenInc
+			tok.Literal = "++"
+		} else {
+			tok.Type = TokenPlus
+			tok.Literal = string(l.ch)
+		}
 	case '-':
-		tok.Type = TokenMinus
-		tok.Literal = string(l.ch)
+		if l.peekChar() == '-' {
+			l.readChar()
+			tok.Type = TokenDec
+			tok.Literal = "--"
+		} else {
+			tok.Type = TokenMinus
+			tok.Literal = string(l.ch)
+		}
 	case '*':
 		tok.Type = TokenAsterisk
 		tok.Literal = string(l.ch)

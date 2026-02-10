@@ -384,3 +384,16 @@ func (c *ChainCallExpr) String() string {
 	return strings.Join(calls, ".")
 }
 func (c *ChainCallExpr) exprNode() {}
+
+// PostfixExpr 后置表达式（自增自减）
+type PostfixExpr struct {
+	StartPos Position
+	Left     Expression
+	Op       string // "++" 或 "--"
+}
+
+func (p *PostfixExpr) Pos() Position { return p.StartPos }
+func (p *PostfixExpr) String() string {
+	return fmt.Sprintf("(%s%s)", p.Left.String(), p.Op)
+}
+func (p *PostfixExpr) exprNode() {}

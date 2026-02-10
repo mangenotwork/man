@@ -342,21 +342,52 @@ bug:
 var s = "test"
 s.print()
 
+
+// 1. 变量自增自减
+var i = 5
+i++
+print(i)  // 应该输出6
+var j = i--
+print(j)  // 应该输出6
+print(i)  // 应该输出5
+
+
+// 2. 运算过程支持
+var a = 10
+var b = a++ + 5
+print(b)  // 应该输出15
+print(a)  // 应该输出11
+
+
+// 3. 在判断循环中支持
+var x = 0
+while x++ < 3 {
+    print("x = " + x)
+}
+
+
+// 4. 列表元素自增自减
+var list = [1, 2, 3]
+list[1]++
+print(list)  // 应该输出[1, 3, 3]
+
+
+// 5. 字典元素自增自减
+var dict = {"a": 1, "b": 2}
+dict["a"]--
+print(dict["a"])  // 应该输出0
+
+
+
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-chrome init prot=123 proty="127.0.0.1"
-var x = 11
-if x ==1 {
-	print("大于0")
-} elif x == 15 {
-    print("大于5")
-} elif x == 11 {
-    print("大于10")
-} else {
-    print("其他")
+// 3. 在判断循环中支持
+var x = 0
+while x++ < 3 {
+    print("x = " + x)
 }
 `
 

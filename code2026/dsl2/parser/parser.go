@@ -1512,11 +1512,60 @@ func (p *Parser) parsePostfix(expr ast.Expression) ast.Expression {
 					return expr
 				}
 			}
+		case lexer.TokenInc, lexer.TokenDec:
+			// 自增自减表达式
+			expr = p.parsePostfixExpr(expr)
+			logger.Debug("parsePostfix: 解析自增自减后，expr=%T(%v)", expr, expr)
 		default:
 			// 既不是调用也不是下标也不是链式，返回当前表达式
 			logger.Debug("parsePostfix: 返回表达式: %T(%v)", expr, expr)
 			return expr
 		}
+	}
+}
+
+// 添加parsePostfixExpr函数
+func (p *Parser) parsePostfixExpr(left ast.Expression) ast.Expression {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	logger.Debug("parsePostfixExpr: 开始解析，left=%T(%v), op=%s", left, left, p.curTok.Literal)
+
+	// 保存操作符
+	op := p.curTok.Literal
+	opLine := p.curTok.Line
+	opColumn := p.curTok.Column
+
+	// 跳过操作符
+	p.nextToken()
+
+	// 检查左边表达式是否有效
+	switch left.(type) {
+	case *ast.Identifier, *ast.IndexExpr:
+		// 变量或下标表达式是有效的
+		return &ast.PostfixExpr{
+			StartPos: ast.Position{
+				Line:   opLine,
+				Column: opColumn,
+			},
+			Left: left,
+			Op:   op,
+		}
+	case *ast.Integer, *ast.Float:
+		// 数字字面量不允许自增自减
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 自增自减操作不能用于数字字面量",
+				opLine, opColumn))
+		return nil
+	default:
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 自增自减操作只支持变量、下标表达式或数字字面量，得到: %T",
+				opLine, opColumn, left))
+		return nil
 	}
 }
 

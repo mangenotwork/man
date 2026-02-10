@@ -177,7 +177,9 @@ func (i *Interpreter) evaluateExpr(expr ast.Expression, ctx *Context, hang int) 
 	case *ast.UnaryExpr:
 		logger.Debug("evaluateExpr ast.UnaryExpr ==> ", e)
 		return i.evaluateUnaryExpr(e, ctx, hang)
-
+	case *ast.PostfixExpr: // 添加对自增自减的处理
+		logger.Debug("evaluateExpr ast.PostfixExpr ==> ", e)
+		return i.evaluatePostfixExpr(e, ctx, hang)
 	case *ast.CallExpr:
 		logger.Debug("evaluateExpr ast.CallExpr ==> ", e)
 		return i.evaluateCallExpr(e, ctx, hang)
@@ -1226,4 +1228,156 @@ func (i *Interpreter) evaluateChainCall(chain *ast.ChainCallExpr, ctx *Context, 
 	}
 
 	return lastResult
+}
+
+// 添加evaluatePostfixExpr函数
+func (i *Interpreter) evaluatePostfixExpr(expr *ast.PostfixExpr, ctx *Context, hang int) Value {
+	logger.Debug("evaluatePostfixExpr: 开始，表达式=%v", expr)
+
+	// 先获取原始值
+	var originalValue Value
+	var target interface{} // 用于存储修改的目标
+
+	switch left := expr.Left.(type) {
+	case *ast.Identifier:
+		// 变量自增自减
+		val, ok := ctx.GetVar(left.Name)
+		if !ok {
+			i.errors = append(i.errors, fmt.Errorf("未定义的变量: %s", left.Name))
+			return nil
+		}
+		originalValue = val
+		target = left // 存储标识符以便修改
+
+	case *ast.IndexExpr:
+		// 列表或字典元素自增自减
+		// 先获取容器和索引
+		container := i.evaluateExpr(left.Left, ctx, hang)
+		index := i.evaluateExpr(left.Index, ctx, hang)
+
+		// 根据容器类型获取原始值
+		switch c := container.(type) {
+		case []Value: // 列表
+			idx, ok := index.(int64)
+			if !ok {
+				i.errors = append(i.errors, fmt.Errorf("列表下标必须是整数"))
+				return nil
+			}
+			if idx < 0 || idx >= int64(len(c)) {
+				i.errors = append(i.errors, fmt.Errorf("列表下标越界"))
+				return nil
+			}
+			originalValue = c[idx]
+			target = &indexTarget{
+				container: container,
+				index:     idx,
+				isList:    true,
+			}
+
+		case DictType: // 字典
+			if !i.isHashable(index) {
+				i.errors = append(i.errors, fmt.Errorf("字典键必须是可哈希类型"))
+				return nil
+			}
+			val, exists := c[index]
+			if !exists {
+				i.errors = append(i.errors, fmt.Errorf("字典中不存在键: %v", index))
+				return nil
+			}
+			originalValue = val
+			target = &indexTarget{
+				container: container,
+				index:     index,
+				isDict:    true,
+			}
+
+		default:
+			i.errors = append(i.errors, fmt.Errorf("下标操作只支持列表或字典"))
+			return nil
+		}
+
+	case *ast.Integer, *ast.Float:
+		// 数字字面量自增自减
+		//originalValue = i.evaluateExpr(left, ctx, hang)
+		//target = nil // 数字字面量不能修改，返回新值
+		fmt.Printf("自增自减操作不能用于数字字面量")
+
+	default:
+		i.errors = append(i.errors, fmt.Errorf("不支持的左值类型: %T", left))
+		return nil
+	}
+
+	logger.Debug("原始值: %v, 操作符: %s", originalValue, expr.Op)
+
+	// 根据操作符计算新值
+	var newValue Value
+	switch expr.Op {
+	case "++":
+		newValue = i.increment(originalValue)
+	case "--":
+		newValue = i.decrement(originalValue)
+	default:
+		i.errors = append(i.errors, fmt.Errorf("不支持的操作符: %s", expr.Op))
+		return nil
+	}
+
+	// 如果目标存在，更新值
+	if target != nil {
+		switch t := target.(type) {
+		case *ast.Identifier:
+			// 更新变量
+			ctx.SetVar(t.Name, newValue)
+			logger.Debug("更新变量 %s: %v -> %v", t.Name, originalValue, newValue)
+
+		case *indexTarget:
+			// 更新列表或字典元素
+			if t.isList {
+				idx := t.index.(int64)
+				container := t.container.([]Value)
+				container[idx] = newValue
+				logger.Debug("更新列表元素[%d]: %v -> %v", idx, originalValue, newValue)
+			} else if t.isDict {
+				container := t.container.(DictType)
+				container[t.index] = newValue
+				logger.Debug("更新字典元素[%v]: %v -> %v", t.index, originalValue, newValue)
+			}
+		}
+	}
+
+	// 后置操作返回原始值
+	return originalValue
+}
+
+// 辅助结构，用于存储下标目标
+type indexTarget struct {
+	container interface{}
+	index     interface{}
+	isList    bool
+	isDict    bool
+}
+
+// 添加increment函数
+func (i *Interpreter) increment(value Value) Value {
+	switch v := value.(type) {
+	case int64:
+		return v + 1
+	case float64:
+		return v + 1.0
+	default:
+		i.errors = append(i.errors, fmt.Errorf("自增操作不支持的类型: %T", value))
+		return value
+	}
+}
+
+// 添加decrement函数
+func (i *Interpreter) decrement(value Value) Value {
+	switch v := value.(type) {
+	case int64:
+		return v - 1
+	case float64:
+		return v - 1.0
+	default:
+		i.errors = append(i.errors, fmt.Errorf("自减操作不支持的类型: %T", value))
+		return value
+	}
 }
