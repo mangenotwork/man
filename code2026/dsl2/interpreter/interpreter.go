@@ -142,6 +142,11 @@ func (i *Interpreter) evaluateStmt(stmt ast.Statement, ctx *Context, hang int) V
 		return i.evaluateForStmt(s, ctx, hang)
 	case *ast.IndexAssignStmt: // 添加下标赋值处理
 		return i.evaluateIndexAssignStmt(s, ctx, hang)
+	case *ast.ForInStmt:
+		return i.evaluateForInStmt(s, ctx, hang)
+
+	case *ast.WhileInStmt:
+		return i.evaluateWhileInStmt(s, ctx, hang)
 	default:
 		logger.Debug("[Crash]len:", hang, " | ", fmt.Errorf("不支持的语句类型: %T", stmt))
 		os.Exit(0)
@@ -1380,4 +1385,257 @@ func (i *Interpreter) decrement(value Value) Value {
 		i.errors = append(i.errors, fmt.Errorf("自减操作不支持的类型: %T", value))
 		return value
 	}
+}
+
+// evaluateForInStmt 执行 for...in 语句
+func (i *Interpreter) evaluateForInStmt(stmt *ast.ForInStmt, ctx *Context, hang int) Value {
+	logger.Debug("evaluateForInStmt ==> ", stmt)
+
+	// 获取容器
+	container := i.evaluateExpr(stmt.Container, ctx, hang)
+	if container == nil {
+		i.errors = append(i.errors, fmt.Errorf("for...in语句的容器表达式求值为空"))
+		return nil
+	}
+
+	// 检查变量数量
+	if len(stmt.VarNames) > 2 {
+		i.errors = append(i.errors,
+			fmt.Errorf("for...in语句最多支持2个变量，得到: %d", len(stmt.VarNames)))
+		return nil
+	}
+
+	logger.Debug("for...in: 容器类型 = %T, 变量数 = %d", container, len(stmt.VarNames))
+
+	// 遍历容器
+	switch c := container.(type) {
+	case []Value: // 列表
+		if len(stmt.VarNames) == 1 {
+			// 单变量模式：elem in list -> elem 是元素值
+			for idx := 0; idx < len(c); idx++ {
+				if !i.executeForInIteration(stmt, ctx, hang, []Value{c[idx]}) {
+					break
+				}
+			}
+		} else if len(stmt.VarNames) == 2 {
+			// 双变量模式：i, val in list -> i 是索引，val 是值
+			for idx := 0; idx < len(c); idx++ {
+				if !i.executeForInIteration(stmt, ctx, hang, []Value{int64(idx), c[idx]}) {
+					break
+				}
+			}
+		}
+
+	case DictType: // 字典
+		if len(stmt.VarNames) == 1 {
+			// 单变量模式：key in dict -> key 是键
+			for key := range c {
+				if !i.executeForInIteration(stmt, ctx, hang, []Value{key}) {
+					break
+				}
+			}
+		} else if len(stmt.VarNames) == 2 {
+			// 双变量模式：key, value in dict
+			for key, value := range c {
+				if !i.executeForInIteration(stmt, ctx, hang, []Value{key, value}) {
+					break
+				}
+			}
+		}
+
+	default:
+		i.errors = append(i.errors,
+			fmt.Errorf("for...in语句只支持列表或字典，得到: %T", container))
+		return nil
+	}
+
+	return nil
+}
+
+// executeForInIteration 执行 for...in 循环的一次迭代
+func (i *Interpreter) executeForInIteration(stmt *ast.ForInStmt, ctx *Context, hang int, values []Value) bool {
+	// 创建新的作用域
+	loopCtx := NewContext(ctx)
+
+	// 设置循环变量
+	for idx, varName := range stmt.VarNames {
+		if idx < len(values) {
+			loopCtx.SetVar(varName.Name, values[idx])
+			logger.Debug("设置循环变量 %s = %v", varName.Name, values[idx])
+
+			// 同时设置到父作用域，以便内层循环可以访问
+			ctx.SetVar(varName.Name, values[idx])
+		}
+	}
+
+	// 执行循环体
+	for _, stmtItem := range stmt.Body.Stmts {
+		_ = i.evaluateStmt(stmtItem, loopCtx, hang)
+
+		// 检查控制流
+		if loopCtx.hasReturn {
+			ctx.hasReturn = true
+			ctx.returnVal = loopCtx.returnVal
+			logger.Debug("检测到 return，停止循环")
+			return false
+		}
+		if loopCtx.hasBreak {
+			logger.Debug("检测到 break，停止循环")
+			return false
+		}
+		if loopCtx.hasContinue {
+			logger.Debug("检测到 continue，跳过本次迭代剩余部分")
+			break
+		}
+	}
+
+	// 处理控制流
+	if loopCtx.hasReturn {
+		ctx.hasReturn = true
+		ctx.returnVal = loopCtx.returnVal
+		logger.Debug("检测到 return，停止循环")
+		return false
+	}
+
+	// 同步变量到父作用域
+	for k, v := range loopCtx.variables {
+		// 跳过循环变量（已经设置过了）
+		isLoopVar := false
+		for _, varName := range stmt.VarNames {
+			if k == varName.Name {
+				isLoopVar = true
+				break
+			}
+		}
+		if !isLoopVar {
+			ctx.SetVar(k, v)
+			logger.Debug("同步变量到父作用域: %s = %v", k, v)
+		}
+	}
+
+	return true
+}
+
+// evaluateWhileInStmt 执行 while...in 语句
+func (i *Interpreter) evaluateWhileInStmt(stmt *ast.WhileInStmt, ctx *Context, hang int) Value {
+	logger.Debug("evaluateWhileInStmt ==> ", stmt)
+
+	// 获取容器
+	container := i.evaluateExpr(stmt.Container, ctx, hang)
+	if container == nil {
+		i.errors = append(i.errors, fmt.Errorf("while...in语句的容器表达式求值为空"))
+		return nil
+	}
+
+	// 检查变量数量
+	if len(stmt.VarNames) > 2 {
+		i.errors = append(i.errors,
+			fmt.Errorf("while...in语句最多支持2个变量，得到: %d", len(stmt.VarNames)))
+		return nil
+	}
+
+	// 遍历容器
+	switch c := container.(type) {
+	case []Value: // 列表
+		if len(stmt.VarNames) == 1 {
+			// 单变量模式：elem in list -> elem 是元素值
+			idx := 0
+			for idx < len(c) {
+				if !i.executeWhileInIteration(stmt, ctx, hang, []Value{c[idx]}) {
+					break
+				}
+				idx++
+			}
+		} else if len(stmt.VarNames) == 2 {
+			// 双变量模式：i, val in list -> i 是索引，val 是值
+			idx := 0
+			for idx < len(c) {
+				if !i.executeWhileInIteration(stmt, ctx, hang, []Value{int64(idx), c[idx]}) {
+					break
+				}
+				idx++
+			}
+		}
+
+	case DictType: // 字典
+		// 将键收集到切片中，因为map遍历顺序不确定
+		keys := make([]Value, 0, len(c))
+		for key := range c {
+			keys = append(keys, key)
+		}
+
+		if len(stmt.VarNames) == 1 {
+			// 单变量模式：key in dict -> key 是键
+			idx := 0
+			for idx < len(keys) {
+				if !i.executeWhileInIteration(stmt, ctx, hang, []Value{keys[idx]}) {
+					break
+				}
+				idx++
+			}
+		} else if len(stmt.VarNames) == 2 {
+			// 双变量模式：key, value in dict
+			idx := 0
+			for idx < len(keys) {
+				key := keys[idx]
+				value := c[key]
+				if !i.executeWhileInIteration(stmt, ctx, hang, []Value{key, value}) {
+					break
+				}
+				idx++
+			}
+		}
+
+	default:
+		i.errors = append(i.errors,
+			fmt.Errorf("while...in语句只支持列表或字典，得到: %T", container))
+		return nil
+	}
+
+	return nil
+}
+
+// executeWhileInIteration 执行 while...in 循环的一次迭代
+func (i *Interpreter) executeWhileInIteration(stmt *ast.WhileInStmt, ctx *Context, hang int, values []Value) bool {
+	// 创建新的作用域
+	loopCtx := NewContext(ctx)
+
+	// 设置循环变量
+	for idx, varName := range stmt.VarNames {
+		if idx < len(values) {
+			loopCtx.SetVar(varName.Name, values[idx])
+		}
+	}
+
+	// 执行循环体
+	for _, stmtItem := range stmt.Body.Stmts {
+		_ = i.evaluateStmt(stmtItem, loopCtx, hang)
+
+		// 检查控制流
+		if loopCtx.hasReturn {
+			ctx.hasReturn = true
+			ctx.returnVal = loopCtx.returnVal
+			return false
+		}
+		if loopCtx.hasBreak {
+			return false
+		}
+		if loopCtx.hasContinue {
+			break
+		}
+	}
+
+	// 处理控制流
+	if loopCtx.hasReturn {
+		ctx.hasReturn = true
+		ctx.returnVal = loopCtx.returnVal
+		return false
+	}
+
+	// 同步变量到父作用域
+	for k, v := range loopCtx.variables {
+		ctx.SetVar(k, v)
+	}
+
+	return true
 }

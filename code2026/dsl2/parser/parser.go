@@ -147,8 +147,6 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseVarStatement()
 	case lexer.TokenIf:
 		return p.parseIfStatement()
-	case lexer.TokenWhile:
-		return p.parseWhileStatement()
 	case lexer.TokenReturn:
 		return p.parseReturnStatement()
 	case lexer.TokenLBrace:
@@ -160,10 +158,33 @@ func (p *Parser) parseStatement() ast.Statement {
 	case lexer.TokenContinue:
 		return p.parseContinueStatement()
 	case lexer.TokenFor:
-		return p.parseForStatement()
+		// 检查是否是 for...in
+		return p.parseForOrForIn()
+	case lexer.TokenWhile:
+		// 检查是否是 while...in
+		return p.parseWhileOrWhileIn()
 	default:
 		return p.parseSimpleStatement()
 	}
+}
+
+// peekTokenIs 查看下一个token的类型
+func (p *Parser) peekTokenIs(t lexer.TokenType) bool {
+	// 保存当前状态
+	savedLexer := *p.lexer
+	savedCurTok := p.curTok
+	savedDepth := p.depth
+
+	// 读取下一个token
+	p.nextToken()
+	result := p.curTokenIs(t)
+
+	// 恢复状态
+	p.lexer = &savedLexer
+	p.curTok = savedCurTok
+	p.depth = savedDepth
+
+	return result
 }
 
 func (p *Parser) parseSimpleStatement() ast.Statement {
@@ -1985,4 +2006,331 @@ func (p *Parser) convertToCallExpr(expr ast.Expression) *ast.CallExpr {
 	// 对于简单情况，如果表达式是标识符，但还没有被处理
 	// 这里需要根据你的语法进行调整
 	return nil
+}
+
+// parseForInStatement 解析 for...in 语句
+func (p *Parser) parseForInStatement() *ast.ForInStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	logger.Debug("parseForInStatement: 开始，当前token = %v", p.curTok)
+
+	stmt := &ast.ForInStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		VarNames: []*ast.Identifier{},
+	}
+
+	// 跳过 for
+	p.expect(lexer.TokenFor, "for...in语句开始")
+	logger.Debug("parseForInStatement: 跳过for后，当前token = %v", p.curTok)
+
+	// 解析第一个变量名
+	if !p.curTokenIs(lexer.TokenIdent) {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 期望标识符作为循环变量，得到: %s",
+				p.curTok.Line, p.curTok.Column, p.curTok.Type))
+		return nil
+	}
+
+	// 添加第一个变量
+	stmt.VarNames = append(stmt.VarNames, &ast.Identifier{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		Name: p.curTok.Literal,
+	})
+
+	logger.Debug("parseForInStatement: 第一个变量名 = %s", p.curTok.Literal)
+	p.nextToken() // 跳过第一个变量名
+	logger.Debug("parseForInStatement: 跳过第一个变量名后，当前token = %v", p.curTok)
+
+	// 检查是否有第二个变量（逗号分隔）
+	if p.curTokenIs(lexer.TokenComma) {
+		p.nextToken() // 跳过逗号
+		logger.Debug("parseForInStatement: 跳过逗号后，当前token = %v", p.curTok)
+
+		if !p.curTokenIs(lexer.TokenIdent) {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 期望第二个标识符作为循环变量，得到: %s",
+					p.curTok.Line, p.curTok.Column, p.curTok.Type))
+			return nil
+		}
+
+		// 添加第二个变量
+		stmt.VarNames = append(stmt.VarNames, &ast.Identifier{
+			StartPos: ast.Position{
+				Line:   p.curTok.Line,
+				Column: p.curTok.Column,
+			},
+			Name: p.curTok.Literal,
+		})
+
+		logger.Debug("parseForInStatement: 第二个变量名 = %s", p.curTok.Literal)
+		p.nextToken() // 跳过第二个变量名
+		logger.Debug("parseForInStatement: 跳过第二个变量名后，当前token = %v", p.curTok)
+	}
+
+	// 期望 in
+	if !p.curTokenIs(lexer.TokenIn) {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: for...in语句需要'in'关键字，得到: %s (字面量: %s)",
+				p.curTok.Line, p.curTok.Column, p.curTok.Type, p.curTok.Literal))
+		return nil
+	}
+
+	p.nextToken() // 跳过 in
+	logger.Debug("parseForInStatement: 跳过in后，当前token = %v", p.curTok)
+
+	// 解析容器表达式
+	stmt.Container = p.parseExpression()
+	if stmt.Container == nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: for...in语句需要容器表达式",
+				p.curTok.Line, p.curTok.Column))
+		return nil
+	}
+
+	logger.Debug("parseForInStatement: 容器表达式 = %v", stmt.Container)
+	logger.Debug("parseForInStatement: 解析容器后，当前token = %v", p.curTok)
+
+	// 解析循环体
+	stmt.Body = p.parseBlockStatement()
+	if stmt.Body == nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: for...in语句需要循环体",
+				p.curTok.Line, p.curTok.Column))
+		return nil
+	}
+
+	logger.Debug("parseForInStatement: 解析成功，变量数 = %d", len(stmt.VarNames))
+	return stmt
+}
+
+// parseWhileInStatement 解析 while...in 语句
+func (p *Parser) parseWhileInStatement() *ast.WhileInStmt {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	stmt := &ast.WhileInStmt{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		VarNames: []*ast.Identifier{},
+	}
+
+	// 跳过 while
+	p.expect(lexer.TokenWhile, "while...in语句开始")
+
+	// 解析第一个变量名
+	if !p.curTokenIs(lexer.TokenIdent) {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: 期望标识符作为循环变量，得到: %s",
+				p.curTok.Line, p.curTok.Column, p.curTok.Type))
+		return nil
+	}
+
+	// 添加第一个变量
+	stmt.VarNames = append(stmt.VarNames, &ast.Identifier{
+		StartPos: ast.Position{
+			Line:   p.curTok.Line,
+			Column: p.curTok.Column,
+		},
+		Name: p.curTok.Literal,
+	})
+
+	p.nextToken() // 跳过第一个变量名
+
+	// 检查是否有第二个变量（逗号分隔）
+	if p.curTokenIs(lexer.TokenComma) {
+		p.nextToken() // 跳过逗号
+
+		if !p.curTokenIs(lexer.TokenIdent) {
+			p.errors = append(p.errors,
+				fmt.Sprintf("第%d行第%d列: 期望第二个标识符作为循环变量，得到: %s",
+					p.curTok.Line, p.curTok.Column, p.curTok.Type))
+			return nil
+		}
+
+		// 添加第二个变量
+		stmt.VarNames = append(stmt.VarNames, &ast.Identifier{
+			StartPos: ast.Position{
+				Line:   p.curTok.Line,
+				Column: p.curTok.Column,
+			},
+			Name: p.curTok.Literal,
+		})
+
+		p.nextToken() // 跳过第二个变量名
+	}
+
+	// 期望 in
+	if !p.curTokenIs(lexer.TokenIn) {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: while...in语句需要'in'关键字，得到: %s",
+				p.curTok.Line, p.curTok.Column, p.curTok.Type))
+		return nil
+	}
+
+	p.nextToken() // 跳过 in
+
+	// 解析容器表达式
+	stmt.Container = p.parseExpression()
+	if stmt.Container == nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: while...in语句需要容器表达式",
+				p.curTok.Line, p.curTok.Column))
+		return nil
+	}
+
+	// 解析循环体
+	stmt.Body = p.parseBlockStatement()
+	if stmt.Body == nil {
+		p.errors = append(p.errors,
+			fmt.Sprintf("第%d行第%d列: while...in语句需要循环体",
+				p.curTok.Line, p.curTok.Column))
+		return nil
+	}
+
+	return stmt
+}
+
+// parseForOrForIn 解析 for 或 for...in 语句
+func (p *Parser) parseForOrForIn() ast.Statement {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	logger.Debug("parseForOrForIn: 开始，当前token = %v", p.curTok)
+
+	// 保存当前位置
+	savedLexer := *p.lexer
+	savedCurTok := p.curTok
+	savedDepth := p.depth
+
+	// 1. 跳过 for
+	p.nextToken()
+
+	// 2. 尝试解析 for...in 模式
+	isForIn := false
+	tokenCount := 0
+	maxTokens := 5 // 最多向前看5个token
+
+	for tokenCount < maxTokens && !p.curTokenIs(lexer.TokenEOF) {
+		tokenCount++
+
+		logger.Debug("parseForOrForIn: 检查token[%d] = %v", tokenCount, p.curTok)
+
+		// 检查是否遇到 in
+		if p.curTokenIs(lexer.TokenIn) {
+			isForIn = true
+			logger.Debug("parseForOrForIn: 发现 in 关键字，是 for...in 语句")
+			break
+		}
+
+		// 检查是否遇到 {，说明是普通 for 循环
+		if p.curTokenIs(lexer.TokenLBrace) {
+			logger.Debug("parseForOrForIn: 发现 {，是普通 for 循环")
+			break
+		}
+
+		// 检查是否遇到 ;，说明是普通 for 循环
+		if p.curTokenIs(lexer.TokenSemicolon) {
+			logger.Debug("parseForOrForIn: 发现 ;，是普通 for 循环")
+			break
+		}
+
+		// 继续读取下一个token
+		p.nextToken()
+	}
+
+	// 3. 恢复状态
+	*p.lexer = savedLexer
+	p.curTok = savedCurTok
+	p.depth = savedDepth
+
+	// 4. 根据检测结果调用相应的解析函数
+	if isForIn {
+		logger.Debug("parseForOrForIn: 调用 parseForInStatement")
+		return p.parseForInStatement()
+	} else {
+		logger.Debug("parseForOrForIn: 调用 parseForStatement")
+		return p.parseForStatement()
+	}
+}
+
+// parseWhileOrWhileIn 解析 while 或 while...in 语句
+func (p *Parser) parseWhileOrWhileIn() ast.Statement {
+	if !p.checkDepth() {
+		return nil
+	}
+
+	p.enter()
+	defer p.leave()
+
+	logger.Debug("parseWhileOrWhileIn: 开始，当前token = %v", p.curTok)
+
+	// 保存当前位置
+	savedLexer := *p.lexer
+	savedCurTok := p.curTok
+	savedDepth := p.depth
+
+	// 1. 跳过 while
+	p.nextToken()
+
+	// 2. 尝试解析 while...in 模式
+	isWhileIn := false
+	tokenCount := 0
+	maxTokens := 5 // 最多向前看5个token
+
+	for tokenCount < maxTokens && !p.curTokenIs(lexer.TokenEOF) {
+		tokenCount++
+
+		logger.Debug("parseWhileOrWhileIn: 检查token[%d] = %v", tokenCount, p.curTok)
+
+		// 检查是否遇到 in
+		if p.curTokenIs(lexer.TokenIn) {
+			isWhileIn = true
+			logger.Debug("parseWhileOrWhileIn: 发现 in 关键字，是 while...in 语句")
+			break
+		}
+
+		// 检查是否遇到 {，说明是普通 while 循环
+		if p.curTokenIs(lexer.TokenLBrace) {
+			logger.Debug("parseWhileOrWhileIn: 发现 {，是普通 while 循环")
+			break
+		}
+
+		// 继续读取下一个token
+		p.nextToken()
+	}
+
+	// 3. 恢复状态
+	*p.lexer = savedLexer
+	p.curTok = savedCurTok
+	p.depth = savedDepth
+
+	// 4. 根据检测结果调用相应的解析函数
+	if isWhileIn {
+		logger.Debug("parseWhileOrWhileIn: 调用 parseWhileInStatement")
+		return p.parseWhileInStatement()
+	} else {
+		logger.Debug("parseWhileOrWhileIn: 调用 parseWhileStatement")
+		return p.parseWhileStatement()
+	}
 }

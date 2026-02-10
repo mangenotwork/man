@@ -397,3 +397,45 @@ func (p *PostfixExpr) String() string {
 	return fmt.Sprintf("(%s%s)", p.Left.String(), p.Op)
 }
 func (p *PostfixExpr) exprNode() {}
+
+// ForInStmt for...in循环
+type ForInStmt struct {
+	StartPos  Position
+	VarNames  []*Identifier // 变量名列表（支持1-2个变量）
+	Container Expression    // 容器表达式（列表或字典）
+	Body      *BlockStmt    // 循环体
+}
+
+func (f *ForInStmt) Pos() Position { return f.StartPos }
+func (f *ForInStmt) String() string {
+	varNames := make([]string, len(f.VarNames))
+	for i, v := range f.VarNames {
+		varNames[i] = v.Name
+	}
+	return fmt.Sprintf("for %s in %s %s",
+		strings.Join(varNames, ", "),
+		f.Container.String(),
+		f.Body.String())
+}
+func (f *ForInStmt) stmtNode() {}
+
+// WhileInStmt while...in循环
+type WhileInStmt struct {
+	StartPos  Position
+	VarNames  []*Identifier // 变量名列表（支持1-2个变量）
+	Container Expression    // 容器表达式（列表或字典）
+	Body      *BlockStmt    // 循环体
+}
+
+func (w *WhileInStmt) Pos() Position { return w.StartPos }
+func (w *WhileInStmt) String() string {
+	varNames := make([]string, len(w.VarNames))
+	for i, v := range w.VarNames {
+		varNames[i] = v.Name
+	}
+	return fmt.Sprintf("while %s in %s %s",
+		strings.Join(varNames, ", "),
+		w.Container.String(),
+		w.Body.String())
+}
+func (w *WhileInStmt) stmtNode() {}

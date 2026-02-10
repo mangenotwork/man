@@ -70,6 +70,7 @@ const (
 	TokenBreak
 	TokenContinue
 	TokenFor
+	TokenIn // in
 )
 
 var tokenTypeStrings = map[TokenType]string{
@@ -119,6 +120,7 @@ var tokenTypeStrings = map[TokenType]string{
 	TokenBreak:     "break",
 	TokenContinue:  "continue",
 	TokenFor:       "for",
+	TokenIn:        "in",
 }
 
 func (t TokenType) String() string {
@@ -560,6 +562,8 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return TokenContinue
 	case "for":
 		return TokenFor
+	case "in":
+		return TokenIn
 	default:
 		return TokenIdent
 	}

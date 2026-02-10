@@ -378,16 +378,101 @@ dict["a"]--
 print(dict["a"])  // 应该输出0
 
 
+// 1. 循环字典
+var data = {"one": 1, "two": 2}
+for key in data {
+    print("键:", key, "值:", data[key])
+}
+
+//// 双变量模式
+for key, value in data {
+   print("键:", key, "值:", value)
+}
+
+// 2. 循环列表
+var list = [1, 2, 3]
+for i in list {
+    print("索引:", i, "值:", list[i])
+}
+
+// 双变量模式
+for i, val in list {
+    print("索引:", i, "值:", val)
+}
+
+// 3. while...in循环
+var i = 0
+while i in list {
+    print("while 索引:", i, "值:", list[i])
+}
+
+// 4. 深度循环（嵌套列表）
+var matrix = [[1, 2], [3, 4], [5, 6]]
+for row in matrix {
+    for elem in row {
+        print("元素:", elem)
+    }
+}
+
+// 5. 深度循环（嵌套字典）
+var nested = {
+    "a": {"x": 1, "y": 2},
+    "b": {"x": 3, "y": 4}
+}
+for outerKey in nested {
+    for innerKey in nested[outerKey] {
+        print("外层键:", outerKey, "内层键:", innerKey, "值:", nested[outerKey][innerKey])
+    }
+}
+
+var data = {"one": 1, "two": 2}
+
+for key, value in data {
+   print("1键:", key, "值:", value)
+}
+
+for key in data {
+    print("2键:", key, "值:", data[key])
+}
+
+while key in data {
+   print("3键:", key, "值:", data[key])
+}
+
+while key, value in data {
+   print("4键:", key, "值:", value)
+}
 
 */
 
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-// 3. 在判断循环中支持
-var x = 0
-while x++ < 3 {
-    print("x = " + x)
+
+var data = {"one": 1, "two": 2}
+
+for key, value in data {
+   print("1键:", key, "值:", value)
+}
+
+for key in data {
+    print("2键:", key, "值:", data[key])
+}
+
+while key in data {
+   print("3键:", key, "值:", data[key])
+}
+
+while key, value in data {
+   print("4键:", key, "值:", value)
+}
+
+// 4. 深度循环（嵌套列表）
+var matrix = [[1, 2], [3, 4], [5, 6]]
+while row in matrix {
+    while elem in row {
+        print("元素:", elem)
+    }
 }
 `
 
