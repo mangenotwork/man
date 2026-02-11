@@ -56,10 +56,10 @@ func runScript(source string) {
 	// 语法分析
 	p := parser.New(l)
 	program := p.ParseProgram()
-
-	if len(p.Errors()) > 0 {
+	errs := p.CleanErrors()
+	if len(errs) > 0 {
 		fmt.Println("解析错误:")
-		for _, err := range p.Errors() {
+		for _, err := range errs {
 			fmt.Println("  " + err)
 		}
 		return
@@ -448,32 +448,8 @@ while key, value in data {
 func runExample2() {
 	// 一个简单的示例脚本
 	script := `
-
-var data = {"one": 1, "two": 2}
-
-for key, value in data {
-   print("1键:", key, "值:", value)
-}
-
-for key in data {
-    print("2键:", key, "值:", data[key])
-}
-
-while key in data {
-   print("3键:", key, "值:", data[key])
-}
-
-while key, value in data {
-   print("4键:", key, "值:", value)
-}
-
-// 4. 深度循环（嵌套列表）
-var matrix = [[1, 2], [3, 4], [5, 6]]
-while row in matrix {
-    while elem in row {
-        print("元素:", elem)
-    }
-}
+a = {"a":}
+bmn
 `
 
 	fmt.Println("执行示例脚本:")
